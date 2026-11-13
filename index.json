@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "title": {
+    "en": "jqlong17 DSH plugins",
+    "zh": "jqlong17 的 DSH 插件"
+  },
+  "description": {
+    "en": "Plugins for the DeepSeek Harness right sidebar.",
+    "zh": "给 DeepSeek Harness 右侧栏用的插件。"
+  },
+  "metadata": {
+    "categories": {
+      "sidebar": {
+        "title": {
+          "en": "Sidebar",
+          "zh": "右侧栏"
+        }
+      }
+    },
+    "labels": {
+      "plugin-management": {
+        "title": {
+          "en": "Plugin management",
+          "zh": "插件管理"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-plugin-panel",
+      "title": {
+        "en": "Plugin panel",
+        "zh": "插件管理"
+      },
+      "description": {
+        "en": "Lists installed plugins, shows where each one lives (right sidebar, settings, left menu, or no UI), pins favourites, and opens a plugin's folder in Finder.",
+        "zh": "列出已安装的插件，标出每个插件的入口（右侧栏、设置、左侧菜单或无界面），支持置顶、列表/卡片视图，还能在访达里定位插件目录。"
+      },
+      "icon": "https://raw.githubusercontent.com/jqlong17/dsh-plugins-ui/main/icon.svg",
+      "author": "jqlong17",
+      "homepage": "https://github.com/jqlong17/dsh-plugins-ui",
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1794585574,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}
