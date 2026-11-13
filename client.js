@@ -3,10 +3,10 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const PANEL_ID = 'dsh-plugins-ui'
+    const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
-    const NS = 'dsh-plugins-ui'
-    const VERSION = 'v0.1.0'
+    const NS = 'dsh-plugin-panel'
+    const VERSION = 'v0.1.1'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -349,6 +349,14 @@ window.__ModuleLoader__.load({
       throw new Error(result && result.error && result.error.message ? result.error.message : 'list failed')
     }
 
+    const SELF_NAMES = new Set(['dsh-plugin-panel', 'dsh-plugins-ui', 'dsh-plugin-canvas'])
+
+    function isSelf(plugin) {
+      const entry = String((plugin && plugin.entryId) || '').replace(/^include:/, '')
+      const moduleName = String((plugin && plugin.moduleName) || '')
+      return SELF_NAMES.has(entry) || SELF_NAMES.has(moduleName) || SELF_NAMES.has(shortModule(moduleName))
+    }
+
     function tabKindFor(plugin, entries, localeId) {
       const names = new Set([
         plugin.entryId,
@@ -380,7 +388,7 @@ window.__ModuleLoader__.load({
     function placesFor(plugin, guide, seats, localeId) {
       const names = namesOf(plugin)
       const places = []
-      if (tabKindFor(plugin, guide, localeId)) places.push('right')
+      if (tabKindFor(plugin, guide, localeId) || isSelf(plugin)) places.push('right')
       for (const seat of seats || []) {
         const id = seat.id || seat.key
         const owner = seat.registrant
