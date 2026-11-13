@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const CHANNEL = '/dsh-plugin-canvas-rpc'
+const CHANNEL = '/dsh-plugins-ui-rpc'
 const MAX_SOURCE_BYTES = 1_200_000
 const MAX_FILES = 40
 const MAX_DOC_CHARS = 2400
