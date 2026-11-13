@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@longjiaqiuu/dsh-plugins-ui',
+  id: 'dsh-plugin-panel',
   factory(require) {
     const React = require('react')
     const h = React.createElement
@@ -810,8 +810,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-grid.is-card .dsh-pl-item { padding: 10px; gap: 8px; }
 .dsh-pl-acts { display: flex; gap: 6px; align-items: center; margin-left: auto; flex: none; }
 .dsh-pl-item { position: relative; }
-.dsh-pl-grid.is-card .dsh-pl-acts { position: absolute; top: 8px; right: 8px; margin: 0; padding: 2px; border-radius: 8px; background: var(--dsw-alias-bg-overlay); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
-.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-pin, .dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-open { padding: 4px 8px; font-size: 11px; }
+.dsh-pl-grid.is-card .dsh-pl-acts { position: absolute; top: 8px; right: 8px; margin: 0; padding: 0; background: transparent; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-pin, .dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-open { padding: 4px 8px; font-size: 11px; border: 0; background: var(--dsw-alias-bg-layer-2); }
 .dsh-pl-grid.is-card .dsh-pl-item:hover .dsh-pl-acts, .dsh-pl-grid.is-card .dsh-pl-item:focus-within .dsh-pl-acts { opacity: 1; pointer-events: auto; }
 .dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: 16px; background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
 .dsh-pl-open, .dsh-pl-pin { margin-left: 0; flex: none; position: static; }

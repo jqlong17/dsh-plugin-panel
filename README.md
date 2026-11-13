@@ -1,4 +1,4 @@
-# 插件管理 · @longjiaqiuu/dsh-plugins-ui
+# 插件管理 · dsh-plugin-panel
 
 给 DeepSeek Harness 右侧栏用的插件管理器。装上以后右侧栏会多一个「插件管理」标签，把已安装的插件列出来，并且告诉你每个插件到底从哪里进。
 
@@ -27,7 +27,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile desktop add @longjiaqiuu/dsh-plugins-ui
+dsh plugin --profile desktop add dsh-plugin-panel
 ```
 
 装完打开右侧栏，应该能看到「插件管理」标签。没出现就去设置 → 插件确认它已启用。
