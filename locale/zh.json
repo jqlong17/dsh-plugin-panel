@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "插件管理",
+    "description": "在右侧栏查看并打开插件。",
+    "detail": "docs/DETAIL.zh.md"
+  }
+}

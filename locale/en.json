@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Plugin manager",
+    "description": "Browse and open plugins in the right sidebar.",
+    "detail": "docs/DETAIL.md"
+  }
+}
