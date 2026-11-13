@@ -1,5 +1,5 @@
 {
-  "name": "dsh-plugins-ui",
+  "name": "dsh-plugin-canvas",
   "version": "0.1.0",
   "description": "Plugin manager for the DeepSeek Harness right sidebar: list installed plugins, see where each one lives, pin favourites, and open a plugin folder in Finder.",
   "type": "module",

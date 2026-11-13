@@ -1,3 +1,3 @@
 - insert:
-    - id: dsh-plugins-ui
-      name: dsh-plugins-ui
+    - id: dsh-plugin-canvas
+      name: dsh-plugin-canvas
