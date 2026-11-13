@@ -1,11 +1,11 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-plugin-canvas',
+  id: '@longjiaqiuu/dsh-plugins-ui',
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const PANEL_ID = 'dsh-plugin-canvas'
+    const PANEL_ID = 'dsh-plugins-ui'
     const TAB_KIND = 'plugin-canvas'
-    const NS = 'dsh-plugin-canvas'
+    const NS = 'dsh-plugins-ui'
     const VERSION = 'v0.1.0'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
@@ -850,7 +850,7 @@ window.__ModuleLoader__.load({
 `
 
     return {
-      name: 'dsh-plugin-canvas',
+      name: 'dsh-plugins-ui',
       inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'layout', 'locale', 'remote', 'remote.pluginManager', 'remote.session', 'connection'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, COPY), 'plugin-list: dictionaries')
@@ -861,7 +861,7 @@ window.__ModuleLoader__.load({
         const readBundleDetail = pluginManager.readBundleDetail.bind(pluginManager)
         const setPluginEnabled = pluginManager.setPluginEnabled.bind(pluginManager)
         const rpcCall = ctx.connection.rpc.call.bind(ctx.connection.rpc)
-        const loadFacts = (payload) => rpcCall('/dsh-plugin-canvas-rpc', 'facts', payload || {})
+        const loadFacts = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'facts', payload || {})
         const revealPackage = async (payload) => {
           const input = payload && typeof payload === 'object' ? payload : {}
           const dir = directoryFromSource(input.source)
@@ -873,7 +873,7 @@ window.__ModuleLoader__.load({
             } catch { /* the host RPC below is the fallback */ }
           }
           try {
-            return await rpcCall('/dsh-plugin-canvas-rpc', 'reveal', {
+            return await rpcCall('/dsh-plugins-ui-rpc', 'reveal', {
               moduleName: input.moduleName || '',
               source: input.source || '',
             })
