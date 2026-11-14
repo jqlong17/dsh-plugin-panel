@@ -467,7 +467,7 @@ async function buildCatalogIndex() {
   return { v: SEARCH_INDEX_VERSION, latest: tag || latest, rows }
 }
 
-async function collectSearch(readCache, writeCache, query, limit = 100, sort = 'relevance') {
+async function collectSearch(readCache, writeCache, query, limit = 100, sort = 'hot') {
   const needle = String(query || '').trim().toLowerCase()
   if (!needle) return { query: '', items: [], total: 0 }
 

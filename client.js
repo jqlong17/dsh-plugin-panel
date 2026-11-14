@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.4'
+    const VERSION = 'v0.1.5'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -29,6 +29,10 @@ window.__ModuleLoader__.load({
         'list.perDay': '日均新增',
         'list.spanDays': '覆盖天数',
         'list.marketFirstNote': '首日已含此前录入的存量，不是从 0 开始',
+        'list.installFailed': '安装失败',
+        'list.removeFailed': '卸载失败',
+        'list.installCancelled': '安装已取消',
+        'list.needBuilds': '需要批准构建脚本',
         'list.install': '安装',
         'list.uninstall': '卸载',
         'list.uninstallConfirm': '确认卸载',
@@ -50,7 +54,6 @@ window.__ModuleLoader__.load({
         'list.searchError': '搜索暂时不可用。如果刚更新过插件，在插件管理里停用再启用一次即可。',
         'list.marketNoMatch': '没有找到匹配的插件',
         'list.marketHits': '找到 {n} 个',
-        'list.sortRelevance': '相关',
         'list.sortHot': '最热',
         'list.sortNew': '最新',
         'list.hotSearch': '搜索插件名、说明或分类…',
@@ -76,6 +79,9 @@ window.__ModuleLoader__.load({
         'list.loading': '正在读取插件…',
         'list.empty': '没有匹配的插件。',
         'list.error': '读不到插件列表。',
+        'list.remove': '卸载',
+        'list.confirmRemove': '确认卸载',
+        'list.removeCancelled': '卸载已取消',
         'list.retry': '重试',
         'list.unavailable': '这个配置档没有插件管理服务。',
         'list.running': '运行中',
@@ -137,6 +143,10 @@ window.__ModuleLoader__.load({
         'list.perDay': 'Per day',
         'list.spanDays': 'Days',
         'list.marketFirstNote': 'First point already includes earlier stock; not growth from zero',
+        'list.installFailed': 'Install failed',
+        'list.removeFailed': 'Remove failed',
+        'list.installCancelled': 'Install cancelled',
+        'list.needBuilds': 'Build scripts need approval',
         'list.install': 'Install',
         'list.uninstall': 'Remove',
         'list.uninstallConfirm': 'Confirm',
@@ -158,7 +168,6 @@ window.__ModuleLoader__.load({
         'list.searchError': 'Search is unavailable. If you just updated the plugin, disable and re-enable it once.',
         'list.marketNoMatch': 'No matching plugin',
         'list.marketHits': '{n} found',
-        'list.sortRelevance': 'Relevant',
         'list.sortHot': 'Popular',
         'list.sortNew': 'Newest',
         'list.hotSearch': 'Search by name, description or category…',
@@ -184,6 +193,9 @@ window.__ModuleLoader__.load({
         'list.loading': 'Reading plugins…',
         'list.empty': 'No plugins match.',
         'list.error': 'Could not read the plugin list.',
+        'list.remove': 'Remove',
+        'list.confirmRemove': 'Confirm',
+        'list.removeCancelled': 'Remove cancelled',
         'list.retry': 'Retry',
         'list.unavailable': 'This profile has no plugin manager.',
         'list.running': 'Running',
@@ -800,13 +812,17 @@ window.__ModuleLoader__.load({
       const [hotError, setHotError] = React.useState('')
       const [busyKey, setBusyKey] = React.useState('')
       const [confirmKey, setConfirmKey] = React.useState('')
+      const [actionNote, setActionNote] = React.useState('')
+      const [failedKey, setFailedKey] = React.useState('')
+      const [removeConfirm, setRemoveConfirm] = React.useState('')
+      const [listNote, setListNote] = React.useState('')
       const [selectedMarket, setSelectedMarket] = React.useState(null)
       const [chartMode, setChartMode] = React.useState('cumulative')
       const [hotQuery, setHotQuery] = React.useState('')
       const [marketQuery, setMarketQuery] = React.useState('')
       const [searchResult, setSearchResult] = React.useState(null)
       const [searchStatus, setSearchStatus] = React.useState('')
-      const [searchSort, setSearchSort] = React.useState('relevance')
+      const [searchSort, setSearchSort] = React.useState('hot')
       const [trendError, setTrendError] = React.useState('')
       const [hotStatus, setHotStatus] = React.useState('')
       const [plugins, setPlugins] = React.useState([])
@@ -1177,20 +1193,64 @@ window.__ModuleLoader__.load({
         })
       }
 
+      async function removePlugin(plugin, bundle) {
+        if (typeof props.removeBundle !== 'function' || !bundle) return
+        setListNote('')
+        try {
+          const result = await props.removeBundle(bundle.name)
+          if (result && result.ok === false) {
+            const error = result.error || {}
+            setListNote(`${textOf(t, 'list.removeFailed')}：${error.message || error.code || 'unknown'}`)
+            return
+          }
+          const value = result && result.ok === true ? result.value : result
+          if (value && value.application === 'failed') {
+            const error = value.error || {}
+            setListNote(`${textOf(t, 'list.removeFailed')}：${error.diagnostic || error.code || 'unknown'}`)
+            return
+          }
+          if (value && value.application === 'cancelled') {
+            setListNote(textOf(t, 'list.removeCancelled'))
+            return
+          }
+          setRemoveConfirm('')
+          await load()
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.removeFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
+      }
+
       async function installFromMarket(name) {
         if (typeof props.installBundle !== 'function' || busyKey) return
         setBusyKey(name)
         try {
-          const result = await props.installBundle(String(name))
+          const result = await props.installBundle(String(name), {})
+          if (result && result.ok === false) {
+            const error = result.error || {}
+            setFailedKey(name)
+            setActionNote(`${textOf(t, 'list.installFailed')}：${error.message || error.code || 'unknown'}`)
+            return
+          }
           const value = result && result.ok === true ? result.value : result
           if (value && value.application === 'failed') {
-            setHotError((value.error && (value.error.diagnostic || value.error.code)) || '')
-          } else if (value && Array.isArray(value.pendingBuilds) && value.pendingBuilds.length) {
-            setHotError(`需要批准构建脚本：${value.pendingBuilds.join(', ')}`)
+            const error = value.error || {}
+            setFailedKey(name)
+            setActionNote(`${textOf(t, 'list.installFailed')}：${error.diagnostic || error.code || 'unknown'}`)
+            return
           }
+          if (value && value.application === 'cancelled') {
+            setActionNote(textOf(t, 'list.installCancelled'))
+            return
+          }
+          if (value && Array.isArray(value.pendingBuilds) && value.pendingBuilds.length) {
+            setActionNote(`${textOf(t, 'list.needBuilds')}：${value.pendingBuilds.join(', ')}`)
+            return
+          }
+          setActionNote('')
+          setFailedKey('')
           await load()
         } catch (failure) {
-          setHotError(failure instanceof Error ? failure.message : '')
+          setActionNote(`${textOf(t, 'list.installFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
         } finally {
           setBusyKey('')
         }
@@ -1202,13 +1262,22 @@ window.__ModuleLoader__.load({
         setConfirmKey('')
         try {
           const result = await props.removeBundle(String(name))
+          if (result && result.ok === false) {
+            const error = result.error || {}
+            setActionNote(`${textOf(t, 'list.removeFailed')}：${error.message || error.code || 'unknown'}`)
+            return
+          }
           const value = result && result.ok === true ? result.value : result
           if (value && value.application === 'failed') {
-            setHotError((value.error && (value.error.diagnostic || value.error.code)) || '')
+            const error = value.error || {}
+            setActionNote(`${textOf(t, 'list.removeFailed')}：${error.diagnostic || error.code || 'unknown'}`)
+            return
           }
+          setActionNote('')
+          setFailedKey('')
           await load()
         } catch (failure) {
-          setHotError(failure instanceof Error ? failure.message : '')
+          setActionNote(`${textOf(t, 'list.removeFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
         } finally {
           setBusyKey('')
         }
@@ -1236,7 +1305,7 @@ window.__ModuleLoader__.load({
           type: 'button',
           className: 'dsh-pl-card-btn',
           onClick: (event) => { event.stopPropagation(); void installFromMarket(name) },
-        }, textOf(t, 'list.install'))
+        }, failedKey === name ? textOf(t, 'list.retry') : textOf(t, 'list.install'))
       }
 
       function hotView() {
@@ -1286,7 +1355,7 @@ window.__ModuleLoader__.load({
           return
         }
         setSearchStatus('loading')
-        Promise.resolve(call({ query, sort: sort || 'relevance' })).then((result) => {
+        Promise.resolve(call({ query, sort: sort || 'hot' })).then((result) => {
           if (result && result.ok === false) {
             setSearchResult(null)
             setSearchStatus('error')
@@ -1337,7 +1406,10 @@ window.__ModuleLoader__.load({
           tags: Array.isArray(row.keywords) ? row.keywords : [],
           tagLabel: textOf(t, 'list.tags'),
           note: row.summary || '',
-          actions: [hotAction(row)],
+          actions: [
+            hotAction(row),
+            actionNote ? h('span', { key: 'note', className: 'dsh-pl-note' }, actionNote) : null,
+          ].filter(Boolean),
         })
       }
 
@@ -1371,7 +1443,6 @@ window.__ModuleLoader__.load({
                     h('div', { className: 'dsh-pl-block-head' },
                       h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(items.length))),
                       h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'sort' },
-                        chip('relevance', textOf(t, 'list.sortRelevance'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }),
                         chip('hot', textOf(t, 'list.sortHot'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }),
                         chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }))),
                     h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
@@ -1450,6 +1521,7 @@ window.__ModuleLoader__.load({
               chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
               chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) })),
             h('span', { className: 'dsh-pl-version' }, VERSION))),
+        listNote ? h('p', { className: 'dsh-pl-note dsh-pl-list-note' }, listNote) : null,
         surface === 'featured'
           ? featuredView()
           : surface === 'market'
@@ -1489,6 +1561,21 @@ window.__ModuleLoader__.load({
                         className: classes,
                         onClick: () => setSelectedId(plugin.entryId),
                         actions: [
+                          (() => {
+                            const bundle = matchBundle(plugin, bundles)
+                            if (!bundle || !bundle.removable) return null
+                            const confirming = removeConfirm === plugin.entryId
+                            return h('button', {
+                              key: 'remove',
+                              type: 'button',
+                              className: `dsh-pl-card-btn${confirming ? ' is-danger' : ''}`,
+                              onClick: (event) => {
+                                event.stopPropagation()
+                                if (confirming) void removePlugin(plugin, bundle)
+                                else setRemoveConfirm(plugin.entryId)
+                              },
+                            }, confirming ? textOf(t, 'list.confirmRemove') : textOf(t, 'list.remove'))
+                          })(),
                           h('button', {
                             key: 'pin',
                             type: 'button',
@@ -1559,6 +1646,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-grid.is-card .dsh-pl-item:hover .dsh-pl-acts, .dsh-pl-grid.is-card .dsh-pl-item:focus-within .dsh-pl-acts { opacity: 1; pointer-events: auto; }
 .dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
 .dsh-pl-card-btn { margin-left: 0; flex: none; position: static; }
+.dsh-pl-card-btn.is-danger { color: var(--dsw-alias-state-danger-label); }
+.dsh-pl-list-note { margin: 0 12px 8px; }
 .dsh-pl-item.is-pinned { background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, var(--dsw-alias-bg-layer-1)); }
 .dsh-pl-item img, .dsh-pl-fallback { width: 22px; height: 22px; border-radius: var(--pl-radius-pill); object-fit: cover; flex: none; }
 .dsh-pl-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
