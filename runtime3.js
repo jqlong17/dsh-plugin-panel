@@ -1,10 +1,11 @@
 import { createRequire } from 'node:module'
 import { spawn } from 'node:child_process'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { collectTrend } from './trend.js'
 
-const CHANNEL = '/dsh-plugin-canvas-rpc'
+const CHANNEL = '/dsh-plugins-ui-rpc'
 const MAX_SOURCE_BYTES = 1_200_000
 const MAX_FILES = 40
 const MAX_DOC_CHARS = 2400
@@ -63,6 +64,7 @@ function registerDetailRpc(ctx, services) {
         else if (method === 'counts') result = { ok: true, value: countTools(services, record.payload) }
         else if (method === 'facts') result = { ok: true, value: readFacts(record.payload) }
         else if (method === 'reveal') result = { ok: true, value: revealPackage(record.payload) }
+        else if (method === 'trend') result = { ok: true, value: await readTrend() }
         else throw new Error('Unknown detail method.')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -127,6 +129,33 @@ function directoryFromSource(source) {
   } catch {
     return ''
   }
+}
+
+function trendCacheFile() {
+  const profile = process.env.DSH_PROFILE_DIR || path.join(process.env.HOME || '', '.dsh/profiles/desktop')
+  return path.join(profile, '.plugin-panel', 'trend.json')
+}
+
+function readTrendCache() {
+  try {
+    return JSON.parse(readFileSync(trendCacheFile(), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function writeTrendCache(value) {
+  try {
+    const file = trendCacheFile()
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, JSON.stringify(value))
+  } catch {
+    /* the chart still renders without a cache */
+  }
+}
+
+function readTrend() {
+  return collectTrend(readTrendCache, writeTrendCache)
 }
 
 function readFacts(payload) {

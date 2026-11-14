@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.1'
+    const VERSION = 'v0.1.2'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -18,6 +18,16 @@ window.__ModuleLoader__.load({
         'list.builtin': '系统内置',
         'list.all': '全部',
         'list.refresh': '刷新',
+        'list.market': '市场',
+        'list.back': '返回',
+        'list.marketTitle': '插件市场趋势',
+        'list.marketHint': '来自 dsh-plugin-shop 目录的每日快照，不是 npm 全站统计。',
+        'list.marketLoading': '正在取历史数据，第一次大约十几秒…',
+        'list.marketError': '取不到目录数据。如果刚更新过插件，重启一次 DeepSeek Harness 再试。',
+        'list.countNow': '当前收录',
+        'list.countFiltered': '已过滤',
+        'list.perDay': '日均新增',
+        'list.spanDays': '覆盖天数',
         'list.viewList': '列表',
         'list.viewCard': '卡片',
         'list.open': '打开',
@@ -81,6 +91,16 @@ window.__ModuleLoader__.load({
         'list.builtin': 'Built-in',
         'list.all': 'All',
         'list.refresh': 'Refresh',
+        'list.market': 'Market',
+        'list.back': 'Back',
+        'list.marketTitle': 'Plugin market trend',
+        'list.marketHint': 'Daily snapshots of the dsh-plugin-shop catalog, not a site-wide npm count.',
+        'list.marketLoading': 'Fetching history, about ten seconds the first time…',
+        'list.marketError': 'Could not read the catalog. Restart DeepSeek Harness once if you just updated.',
+        'list.countNow': 'Listed',
+        'list.countFiltered': 'Filtered',
+        'list.perDay': 'Per day',
+        'list.spanDays': 'Days',
         'list.viewList': 'List',
         'list.viewCard': 'Cards',
         'list.open': 'Open',
@@ -251,6 +271,44 @@ window.__ModuleLoader__.load({
       if (tail.startsWith('link:')) return tail.slice(5)
       if (tail.startsWith('file:') && !/\.(tgz|tar\.gz)$/i.test(tail)) return tail.slice(5)
       return ''
+    }
+
+    function trendChart(days) {
+      const W = 1000
+      const H = 340
+      const L = 76
+      const R = 28
+      const T = 24
+      const B = 52
+      const values = days.map((d) => d.count)
+      const max = Math.max(...values, 1) * 1.04
+      const n = days.length
+      const x = (i) => L + (W - L - R) * (n <= 1 ? 0.5 : i / (n - 1))
+      const y = (v) => T + (H - T - B) * (1 - v / max)
+      const line = days.map((d, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(d.count).toFixed(1)}`).join(' ')
+      const area = `${line} L ${x(n - 1).toFixed(1)} ${H - B} L ${x(0).toFixed(1)} ${H - B} Z`
+      const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) => Math.round((max * r) / 1000) * 1000)
+      const labelIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1]
+      return h('svg', { className: 'dsh-pl-chart', viewBox: `0 0 ${W} ${H}`, role: 'img' },
+        ticks.map((tick, i) => h('line', {
+          key: `g${i}`, x1: L, x2: W - R, y1: y(tick), y2: y(tick),
+          stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 1,
+        })),
+        ticks.map((tick, i) => h('text', {
+          key: `t${i}`, x: L - 12, y: y(tick) + 6, textAnchor: 'end',
+          fill: 'var(--dsw-alias-label-secondary)', fontSize: 20,
+        }, `${Math.round(tick / 1000)}k`)),
+        h('path', { d: area, fill: 'var(--dsw-alias-brand-primary)', opacity: 0.12 }),
+        h('path', { d: line, fill: 'none', stroke: 'var(--dsw-alias-brand-primary)', strokeWidth: 4, strokeLinejoin: 'round' }),
+        labelIndexes.map((i) => h('text', {
+          key: `d${i}`, x: x(i), y: H - B + 34, textAnchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
+          fill: 'var(--dsw-alias-label-secondary)', fontSize: 20,
+        }, days[i].day.slice(5))),
+        h('text', {
+          x: x(n - 1), y: y(values[n - 1]) - 16, textAnchor: 'end',
+          fill: 'var(--dsw-alias-label-primary)', fontSize: 26, fontWeight: 600,
+        }, String(values[n - 1])),
+      )
     }
 
     function detailNames(plugin, bundle) {
@@ -449,6 +507,9 @@ window.__ModuleLoader__.load({
       const [filter, setFilter] = React.useState(pref.current.filter)
       const [pins, setPins] = React.useState(pref.current.pins || [])
       const [view, setView] = React.useState(pref.current.layout === 'card' ? 'card' : 'list')
+      const [surface, setSurface] = React.useState('plugins')
+      const [trend, setTrend] = React.useState(null)
+      const [trendStatus, setTrendStatus] = React.useState('')
       const [plugins, setPlugins] = React.useState([])
       const [bundles, setBundles] = React.useState([])
       const [status, setStatus] = React.useState(listPlugins ? 'loading' : 'unavailable')
@@ -573,6 +634,27 @@ window.__ModuleLoader__.load({
         }).catch(() => { if (!cancelled) setFacts(null) })
         return () => { cancelled = true }
       }, [selectedId, plugins, bundles, loadFacts])
+
+      const loadTrend = React.useCallback(async () => {
+        if (typeof loadMarketTrend !== 'function') return
+        setTrendStatus('loading')
+        try {
+          const result = await loadMarketTrend()
+          const value = result && result.ok === true ? result.value : result
+          if (value && Array.isArray(value.days) && value.days.length) {
+            setTrend(value)
+            setTrendStatus('ready')
+          } else {
+            setTrendStatus('error')
+          }
+        } catch {
+          setTrendStatus('error')
+        }
+      }, [loadMarketTrend])
+
+      React.useEffect(() => {
+        if (surface === 'market' && trendStatus === '') void loadTrend()
+      }, [surface, trendStatus, loadTrend])
 
       const visible = React.useMemo(() => {
         const rows = plugins.filter((plugin) => {
@@ -719,6 +801,40 @@ window.__ModuleLoader__.load({
         }, label)
       }
 
+      function marketView() {
+        const days = trend && Array.isArray(trend.days) ? trend.days : []
+        const first = days[0]
+        const last = days[days.length - 1]
+        const span = first && last
+          ? Math.max(1, Math.round((Date.parse(last.day) - Date.parse(first.day)) / 86400000))
+          : 0
+        const perDay = first && last ? Math.round((last.count - first.count) / Math.max(span, 1)) : 0
+        return h('div', { className: 'dsh-pl-market' },
+          h('div', { className: 'dsh-pl-market-head' },
+            h('strong', null, textOf(t, 'list.marketTitle')),
+            h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.marketHint'))),
+          trendStatus === 'loading'
+            ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketLoading'))
+            : trendStatus === 'error'
+              ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketError'))
+              : days.length
+                ? [
+                  h('div', { className: 'dsh-pl-market-stats' },
+                    stat(textOf(t, 'list.countNow'), last.count.toLocaleString()),
+                    stat(textOf(t, 'list.countFiltered'), (last.rejected || 0).toLocaleString()),
+                    stat(textOf(t, 'list.perDay'), `+${perDay.toLocaleString()}`),
+                    stat(textOf(t, 'list.spanDays'), String(days.length))),
+                  trendChart(days),
+                ]
+                : null)
+      }
+
+      function stat(label, value) {
+        return h('div', { className: 'dsh-pl-stat' },
+          h('span', null, label),
+          h('strong', null, value))
+      }
+
       return h('div', { className: 'dsh-pl' },
         h('style', null, CSS),
         h('header', { className: 'dsh-pl-bar' },
@@ -728,11 +844,18 @@ window.__ModuleLoader__.load({
               chip('builtin', textOf(t, 'list.builtin'), filter, (id) => { setFilter(id); remember({ filter: id }) }),
               chip('all', textOf(t, 'list.all'), filter, (id) => { setFilter(id); remember({ filter: id }) })),
             h('button', { type: 'button', onClick: () => { void load() } }, textOf(t, 'list.refresh')),
+            h('button', {
+              type: 'button',
+              className: `dsh-pl-market-btn${surface === 'market' ? ' is-on' : ''}`,
+              onClick: () => setSurface(surface === 'market' ? 'plugins' : 'market'),
+            }, surface === 'market' ? textOf(t, 'list.back') : textOf(t, 'list.market')),
             h('div', { className: 'dsh-pl-view', role: 'group', 'aria-label': 'view' },
               chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
               chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) })),
             h('span', { className: 'dsh-pl-version' }, VERSION))),
-        status === 'loading' && plugins.length === 0
+        surface === 'market'
+          ? marketView()
+          : status === 'loading' && plugins.length === 0
           ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.loading'))
           : status === 'unavailable'
             ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.unavailable'))
@@ -854,6 +977,14 @@ window.__ModuleLoader__.load({
 .dsh-pl-md th { color: var(--dsw-alias-label-secondary); font-weight: 650; background: var(--dsw-alias-bg-layer-1); white-space: nowrap; }
 .dsh-pl-md td:first-child { white-space: nowrap; }
 .dsh-pl-md tr:last-child td { border-bottom: 0; }
+.dsh-pl-market-btn.is-on { background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px 18px 28px; }
+.dsh-pl-market-head strong { display: block; font-size: 15px; margin-bottom: 6px; }
+.dsh-pl-market-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 8px; }
+.dsh-pl-stat { display: flex; flex-direction: column; gap: 4px; min-width: 118px; padding: 10px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
+.dsh-pl-stat span { font-size: 11px; color: var(--dsw-alias-label-secondary); }
+.dsh-pl-stat strong { font-size: 20px; font-weight: 600; }
+.dsh-pl-chart { display: block; width: 100%; height: auto; margin-top: 12px; }
 .dsh-pl-actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
 `
 
@@ -870,6 +1001,7 @@ window.__ModuleLoader__.load({
         const setPluginEnabled = pluginManager.setPluginEnabled.bind(pluginManager)
         const rpcCall = ctx.connection.rpc.call.bind(ctx.connection.rpc)
         const loadFacts = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'facts', payload || {})
+        const loadMarketTrend = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'trend', payload || {})
         const revealPackage = async (payload) => {
           const input = payload && typeof payload === 'object' ? payload : {}
           const dir = directoryFromSource(input.source)
@@ -953,7 +1085,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, loadFacts, revealPackage, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, loadFacts, revealPackage, loadMarketTrend, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }

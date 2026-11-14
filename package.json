@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-panel",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Plugin manager for the DeepSeek Harness right sidebar: list installed plugins, see where each one lives, pin favourites, and open a plugin folder in Finder.",
   "type": "module",
   "exports": {
@@ -11,6 +11,7 @@
   },
   "files": [
     "index.js",
+    "trend.js",
     "client.js",
     "catalog.js",
     "catalog.test.mjs",
