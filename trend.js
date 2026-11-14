@@ -8,6 +8,199 @@
 const CATALOG = 'dsh-plugin-shop-catalog'
 const CDN_BASES = ['https://cdn.jsdelivr.net/npm', 'https://unpkg.com']
 const REGISTRY = 'https://registry.npmjs.org'
+/**
+ * Chinese search terms mapped to the English words the catalog actually uses,
+ * so a query typed in Chinese still reaches English-named packages.
+ */
+const ZH_TERMS = {
+  '上下文': ['context'],
+  '上游': ['upstream'],
+  '专家': ['expert'],
+  '主机': ['host'],
+  '主题': ['theme', 'skin', 'color'],
+  '书签': ['bookmark'],
+  '云': ['cloud'],
+  '交互': ['interactive'],
+  '人设': ['persona'],
+  '代理': ['agent', 'delegate', 'proxy'],
+  '代码': ['code', 'coding'],
+  '任务': ['task', 'job', 'todo'],
+  '会话': ['session', 'chat', 'conversation'],
+  '会话管理': ['session', 'sessions'],
+  '依赖': ['dependencies', 'dependency'],
+  '侧栏': ['sidebar', 'panel'],
+  '免费': ['free'],
+  '内联': ['inline'],
+  '分叉': ['fork'],
+  '删除': ['delete', 'remove', 'purge', 'uninstall'],
+  '剪贴板': ['clipboard', 'paste'],
+  '办公': ['office'],
+  '加密': ['encrypt', 'crypto'],
+  '助手': ['assistant'],
+  '卡片': ['card', 'cards'],
+  '卸载': ['uninstall', 'remove', 'purge'],
+  '压缩': ['compress', 'zip'],
+  '同步': ['sync'],
+  '启动': ['boot', 'launch', 'startup'],
+  '团队': ['team'],
+  '图像': ['image', 'img'],
+  '图片': ['image', 'img', 'picture', 'photo'],
+  '图表': ['chart', 'charts'],
+  '在线': ['online'],
+  '地图': ['map'],
+  '壁纸': ['background', 'wallpaper'],
+  '备份': ['backup'],
+  '外观': ['appearance', 'theme'],
+  '多智能体': ['agents', 'multi', 'multi-agent'],
+  '多模型': ['multi', 'provider'],
+  '子代理': ['subagent', 'agent'],
+  '字体': ['font', 'typeface'],
+  '安装': ['install', 'add'],
+  '官方': ['official'],
+  '实时': ['live'],
+  '审批': ['approval', 'approve'],
+  '审查': ['review', 'audit'],
+  '客户端': ['client'],
+  '容器': ['docker', 'container'],
+  '密钥': ['key', 'secret', 'credential'],
+  '对话': ['chat', 'conversation', 'session'],
+  '导入': ['import'],
+  '导出': ['export'],
+  '工作区': ['workspace', 'worktree'],
+  '工作室': ['studio'],
+  '工具': ['tool', 'tools'],
+  '幻灯片': ['slide', 'ppt', 'presentation'],
+  '引擎': ['engine'],
+  '录音': ['record', 'audio', 'voice'],
+  '待办': ['todo'],
+  '微信': ['wechat'],
+  '快捷键': ['shortcut', 'hotkey'],
+  '截图': ['screenshot', 'snapshot', 'capture'],
+  '技能': ['skill', 'skills'],
+  '报错': ['error', 'debug'],
+  '接口': ['api', 'endpoint'],
+  '控制': ['control'],
+  '推理': ['reasoning'],
+  '提供商': ['provider'],
+  '提示词': ['prompt'],
+  '插件': ['plugin', 'bundle'],
+  '搜索': ['search', 'find', 'query'],
+  '数据': ['data', 'dataset'],
+  '数据库': ['database', 'sql', 'db'],
+  '整理': ['organize', 'sort'],
+  '文件': ['file', 'files'],
+  '文本': ['text'],
+  '文档': ['markdown', 'doc', 'document'],
+  '日志': ['log', 'logs'],
+  '日程': ['schedule', 'cron', 'job'],
+  '智能体': ['agent', 'agents'],
+  '服务器': ['server'],
+  '本地': ['local'],
+  '机器人': ['bot'],
+  '核心': ['core'],
+  '桌宠': ['pet'],
+  '桌面': ['desktop'],
+  '档案': ['profile'],
+  '桥接': ['bridge'],
+  '模型': ['model', 'llm'],
+  '模式': ['mode'],
+  '毛玻璃': ['blur', 'glass'],
+  '浅色': ['light'],
+  '测试': ['test', 'testing'],
+  '浏览': ['browse'],
+  '浏览器': ['browser', 'web', 'chrome'],
+  '消息': ['message', 'messages'],
+  '深色': ['dark', 'night'],
+  '清单': ['list', 'checklist'],
+  '渲染': ['render', 'rendered'],
+  '游戏': ['game'],
+  '爬虫': ['crawl', 'spider', 'scrape'],
+  '状态': ['status'],
+  '生成': ['gen', 'generate'],
+  '用量': ['token', 'usage', 'cost'],
+  '电报': ['telegram'],
+  '画布': ['canvas'],
+  '登录': ['login', 'auth', 'oauth'],
+  '监控': ['monitor', 'metrics', 'watch'],
+  '看板': ['board', 'kanban'],
+  '知识': ['knowledge', 'kb'],
+  '研究': ['research'],
+  '离线': ['offline'],
+  '窗口': ['window'],
+  '策略': ['policy'],
+  '管理': ['manage', 'manager', 'management'],
+  '系统': ['system'],
+  '终端': ['terminal', 'cli', 'shell'],
+  '统计': ['stats', 'meter', 'cost'],
+  '编排': ['orchestrate', 'orchestration'],
+  '编程': ['coding', 'code', 'dev'],
+  '编辑': ['edit'],
+  '网关': ['gateway', 'proxy'],
+  '群聊': ['group'],
+  '翻译': ['translate', 'translation', 'i18n'],
+  '聊天': ['chat'],
+  '背景': ['background'],
+  '自动化': ['auto', 'automation'],
+  '补丁': ['patch'],
+  '表单': ['form', 'forms'],
+  '表格': ['table', 'sheet', 'excel'],
+  '视频': ['video', 'media', 'movie'],
+  '计算': ['calc', 'math'],
+  '记忆': ['memory', 'recall', 'mem'],
+  '设置': ['settings', 'config', 'preferences'],
+  '设计': ['design'],
+  '访问': ['access'],
+  '识别': ['recognize', 'ocr'],
+  '语音': ['audio', 'voice', 'asr', 'speech'],
+  '调试': ['debug'],
+  '跨平台': ['across', 'cross'],
+  '轮次': ['turn'],
+  '输入': ['input', 'composer'],
+  '远程': ['remote'],
+  '连接': ['connect'],
+  '通知': ['notify', 'notification', 'alert'],
+  '邮件': ['mail', 'email'],
+  '部署': ['deploy'],
+  '配置': ['config', 'profile', 'settings'],
+  '配色': ['color', 'colors', 'palette'],
+  '配额': ['limit', 'quota'],
+  '阅读': ['read'],
+  '阅读器': ['reader'],
+  '隔离': ['isolate', 'isolated'],
+  '面板': ['panel', 'sidebar', 'ui', 'widget'],
+  '音乐': ['music', 'audio'],
+  '页面': ['page'],
+  '项目': ['project'],
+  '预设': ['preset'],
+  '频道': ['channel'],
+  '驱动': ['drive', 'driver'],
+}
+
+/** Chinese keywords a catalog row matches, derived from the term table. */
+const GENERIC_ZH = new Set(['插件', '工具', '管理', '系统', '设置', '桌面'])
+
+function zhKeywords(row) {
+  const text = `${row.name || ''} ${row.summary || ''} ${row.category || ''}`.toLowerCase()
+  const hits = []
+  for (const [zh, english] of Object.entries(ZH_TERMS)) {
+    if (GENERIC_ZH.has(zh)) continue
+    if (english.some((word) => text.includes(word))) hits.push(zh)
+  }
+  return hits.slice(0, 8)
+}
+
+const SEARCH_INDEX_VERSION = 3
+
+const CATEGORY_ZH = {
+  tool: '工具',
+  ui: '界面',
+  integration: '集成',
+  workflow: '工作流',
+  other: '其他',
+  provider: '模型接入',
+  theme: '主题',
+}
+
 const MAX_PARALLEL = 6
 const FETCH_TIMEOUT_MS = 20000
 
@@ -171,7 +364,7 @@ async function collectHot(readCache, writeCache, days = 7) {
   const tag = await latestTag()
   const cached = readCache()
   if (cached && cached.value && Array.isArray(cached.value.top) && cached.value.top.length) {
-    if (!tag || cached.latest === tag) return cached.value
+    if (cached.value.v === SEARCH_INDEX_VERSION && (!tag || cached.latest === tag)) return cached.value
   }
 
   const meta = await fetchJson(`${REGISTRY}/${CATALOG}`)
@@ -221,6 +414,7 @@ async function collectHot(readCache, writeCache, days = 7) {
       delta,
       stars: value,
       category: catalog.category || '',
+      categoryZh: CATEGORY_ZH[catalog.category] || '',
       summary: summary.zh || summary.en || '',
     })
   }
@@ -231,7 +425,7 @@ async function collectHot(readCache, writeCache, days = 7) {
     ...row,
     icon: icons.get(`repo:${row.repo}`) || icons.get(`npm:${String(row.name).toLowerCase()}`) || '',
   }))
-  const value = { days, from: older, to: latest, fromDay: versionDate(older), toDay: latestDay, total: rows.size, top }
+  const value = { v: SEARCH_INDEX_VERSION, days, from: older, to: latest, fromDay: versionDate(older), toDay: latestDay, total: rows.size, top }
   writeCache({ fetchedAt: Date.now(), value, latest })
   return value
 }
@@ -245,30 +439,44 @@ async function buildCatalogIndex() {
   const versions = await fetchJson(`${REGISTRY}/${CATALOG}`).then((m) => Object.keys(m.versions || {}))
   const latest = versions[versions.length - 1]
   if (!latest) throw new Error('catalog has no versions')
-  const file = await readCatalogFile(latest, 'plugins')
+  const [file, starFile] = await Promise.all([
+    readCatalogFile(latest, 'plugins'),
+    readCatalogFile(latest, 'stars'),
+  ])
+  const starMap = (starFile && starFile.body && starFile.body.stars) || {}
   const entries = (file && file.body && file.body.plugins) || []
   const rows = []
   for (const entry of entries) {
     if (!entry || !entry.name) continue
     const catalog = entry.catalog || {}
     const summary = catalog.summary || {}
+    const repo = String(entry.repository || '').replace(/^https?:\/\/github\.com\//i, '').replace(/\/$/, '')
     rows.push({
       name: entry.name,
       version: entry.version || '',
       category: catalog.category || '',
+      categoryZh: CATEGORY_ZH[catalog.category] || '',
       summary: summary.zh || summary.en || '',
-      repo: String(entry.repository || '').replace(/^https?:\/\/github\.com\//i, '').replace(/\/$/, ''),
+      repo,
+      added: entry.added || '',
+      publishedAt: entry.publishedAt || '',
+      stars: starMap[entry.name] || starMap[repo] || 0,
     })
+    rows[rows.length - 1].keywords = zhKeywords(rows[rows.length - 1])
   }
-  return { latest: tag || latest, rows }
+  return { v: SEARCH_INDEX_VERSION, latest: tag || latest, rows }
 }
 
-async function collectSearch(readCache, writeCache, query, limit = 100) {
+async function collectSearch(readCache, writeCache, query, limit = 100, sort = 'relevance') {
   const needle = String(query || '').trim().toLowerCase()
   if (!needle) return { query: '', items: [], total: 0 }
 
   let index = readCache()
-  if (!index || !Array.isArray(index.rows) || !index.rows.length) {
+  const stale = !index
+    || index.v !== SEARCH_INDEX_VERSION
+    || !Array.isArray(index.rows)
+    || !index.rows.length
+  if (stale) {
     index = await buildCatalogIndex()
     writeCache(index)
   } else {
@@ -279,16 +487,24 @@ async function collectSearch(readCache, writeCache, query, limit = 100) {
     }
   }
 
-  const items = []
-  for (const row of index.rows) {
-    if (row.name.toLowerCase().includes(needle)
-      || row.summary.toLowerCase().includes(needle)
-      || row.category.toLowerCase().includes(needle)) {
-      items.push(row)
-      if (items.length >= limit) break
-    }
+  const terms = [needle]
+  for (const [zh, english] of Object.entries(ZH_TERMS)) {
+    if (needle.includes(zh)) terms.push(...english)
   }
-  return { query, items, total: index.rows.length }
+
+  const matched = []
+  for (const row of index.rows) {
+    const haystack = `${row.name} ${row.summary} ${row.category} ${row.categoryZh || ''}`.toLowerCase()
+    if (terms.some((term) => haystack.includes(term))) matched.push(row)
+  }
+
+  if (sort === 'hot') {
+    matched.sort((a, b) => (b.stars || 0) - (a.stars || 0))
+  } else if (sort === 'new') {
+    matched.sort((a, b) => String(b.publishedAt || b.added || '').localeCompare(String(a.publishedAt || a.added || '')))
+  }
+
+  return { query, sort, items: matched.slice(0, limit), total: matched.length }
 }
 
 export { collectTrend, collectHot, collectSearch }

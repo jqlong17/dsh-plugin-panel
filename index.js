@@ -224,7 +224,8 @@ function writeSearchCache(value) {
 function readSearch(payload) {
   const input = payload && typeof payload === 'object' ? payload : {}
   const query = typeof input.query === 'string' ? input.query : ''
-  return collectSearch(readSearchCache, writeSearchCache, query, 100)
+  const sort = ['relevance', 'hot', 'new'].includes(input.sort) ? input.sort : 'relevance'
+  return collectSearch(readSearchCache, writeSearchCache, query, 100, sort)
 }
 
 function readFacts(payload) {

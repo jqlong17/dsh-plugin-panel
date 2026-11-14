@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.3'
+    const VERSION = 'v0.1.4'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -17,7 +17,8 @@ window.__ModuleLoader__.load({
         'list.installed': '用户安装',
         'list.builtin': '系统内置',
         'list.refresh': '刷新',
-        'list.market': '市场',
+        'list.market': '市场趋势',
+        'list.featured': '精选推荐',
         'list.back': '返回',
         'list.marketTitle': '插件市场趋势',
         'list.marketHint': '来自 dsh-plugin-shop 目录的每日快照，不是 npm 全站统计。',
@@ -36,6 +37,7 @@ window.__ModuleLoader__.load({
         'list.hotDelta': '7 天增长',
         'list.hotStars': '仓库 star',
         'list.hotCategory': '分类',
+        'list.tags': '标签',
         'list.hotRepo': '仓库',
         'list.installedState': '已安装',
         'list.notInstalled': '未安装',
@@ -43,13 +45,19 @@ window.__ModuleLoader__.load({
         'list.chartCumulative': '累计',
         'list.chartDaily': '每日增量',
         'list.chartDailyHint': '每天新增多少，比累计更能看出快慢',
-        'list.marketSearch': '搜索整个市场的插件…',
+        'list.marketSearch': '搜索整个市场，支持中文，例如「记忆」「截图」',
         'list.marketSearching': '搜索中…',
         'list.searchError': '搜索暂时不可用。如果刚更新过插件，在插件管理里停用再启用一次即可。',
         'list.marketNoMatch': '没有找到匹配的插件',
         'list.marketHits': '找到 {n} 个',
+        'list.sortRelevance': '相关',
+        'list.sortHot': '最热',
+        'list.sortNew': '最新',
         'list.hotSearch': '搜索插件名、说明或分类…',
         'list.hotNoMatch': '没有匹配的插件',
+        'list.featuredLead': '所列插件均经实际安装与使用后收录。',
+        'list.featuredPending': '仍在持续筛选，后续陆续更新。',
+        'list.featuredContact': '如需推荐插件，或希望自己的插件被收录，欢迎微信联系：ruskacoffee',
         'list.hotTitle': '最近 7 天增长最快',
         'list.hotHint': '按 GitHub 仓库 star 的 7 天增量排序，同一仓库只算一次。',
         'list.hotLoading': '正在算增长…',
@@ -117,7 +125,8 @@ window.__ModuleLoader__.load({
         'list.installed': 'Installed',
         'list.builtin': 'Built-in',
         'list.refresh': 'Refresh',
-        'list.market': 'Market',
+        'list.market': 'Market trends',
+        'list.featured': 'Featured',
         'list.back': 'Back',
         'list.marketTitle': 'Plugin market trend',
         'list.marketHint': 'Daily snapshots of the dsh-plugin-shop catalog, not a site-wide npm count.',
@@ -136,6 +145,7 @@ window.__ModuleLoader__.load({
         'list.hotDelta': '7-day growth',
         'list.hotStars': 'Repo stars',
         'list.hotCategory': 'Category',
+        'list.tags': 'Tags',
         'list.hotRepo': 'Repository',
         'list.installedState': 'Installed',
         'list.notInstalled': 'Not installed',
@@ -143,13 +153,19 @@ window.__ModuleLoader__.load({
         'list.chartCumulative': 'Total',
         'list.chartDaily': 'Per day',
         'list.chartDailyHint': 'New plugins per day, which shows pace better than a total',
-        'list.marketSearch': 'Search the whole market…',
+        'list.marketSearch': 'Search the whole market, Chinese works too',
         'list.marketSearching': 'Searching…',
         'list.searchError': 'Search is unavailable. If you just updated the plugin, disable and re-enable it once.',
         'list.marketNoMatch': 'No matching plugin',
         'list.marketHits': '{n} found',
+        'list.sortRelevance': 'Relevant',
+        'list.sortHot': 'Popular',
+        'list.sortNew': 'Newest',
         'list.hotSearch': 'Search by name, description or category…',
         'list.hotNoMatch': 'No matching plugin',
+        'list.featuredLead': 'Listed plugins were installed and used before being included.',
+        'list.featuredPending': 'Still being curated; more will be added.',
+        'list.featuredContact': 'To suggest a plugin or have yours listed, contact us on WeChat: ruskacoffee',
         'list.hotTitle': 'Fastest growing, last 7 days',
         'list.hotHint': 'Ranked by 7-day GitHub repository star delta; one row per repository.',
         'list.hotLoading': 'Crunching growth…',
@@ -647,6 +663,48 @@ window.__ModuleLoader__.load({
       }) || null
     }
 
+    /** Split a sentence around a token so the token can be emphasized. */
+    function withAccent(text, token) {
+      const source = String(text || '')
+      const at = source.indexOf(token)
+      if (!token || at < 0) return source
+      return [
+        source.slice(0, at),
+        h('strong', { key: 'accent', className: 'dsh-pl-accent' }, token),
+        source.slice(at + token.length),
+      ]
+    }
+
+    function compactNumber(value) {
+      const n = Number(value) || 0
+      if (n >= 10000) return `${(n / 1000).toFixed(1)}k`
+      if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+      return String(n)
+    }
+
+    function relativeDay(iso) {
+      if (!iso) return ''
+      const then = Date.parse(iso)
+      if (Number.isNaN(then)) return ''
+      const days = Math.floor((Date.now() - then) / 86400000)
+      if (days <= 0) return '今天'
+      if (days === 1) return '昨天'
+      if (days < 30) return `${days} 天前`
+      if (days < 365) return `${Math.floor(days / 30)} 个月前`
+      return `${Math.floor(days / 365)} 年前`
+    }
+
+    function marketMetric(row) {
+      const stars = row.stars > 0 ? `★ ${compactNumber(row.stars)}` : ''
+      const when = relativeDay(row.publishedAt || '')
+      const parts = [stars, when].filter(Boolean)
+      if (!parts.length) return null
+      return {
+        text: parts.join(' · '),
+        title: [row.stars > 0 ? `${row.stars} stars` : '', row.publishedAt || ''].filter(Boolean).join('  '),
+      }
+    }
+
     /** One card shape, shared by the plugin list and the market ranking. */
     function PluginCard(options) {
       const { icon, title, subtitle, actions, className, onClick, badge } = options
@@ -674,7 +732,7 @@ window.__ModuleLoader__.load({
 
     /** One detail shape, shared by the plugin detail and the market detail. */
     function DetailPanel(options) {
-      const { icon, title, facts, onClose, closeLabel, actions, note, children } = options
+      const { icon, title, facts, onClose, closeLabel, actions, note, children, tags } = options
       const rows = (facts || []).filter((entry) => entry && entry.value)
       return h('aside', { className: 'dsh-pl-detail' },
         h('div', { className: 'dsh-pl-detail-head' },
@@ -685,6 +743,11 @@ window.__ModuleLoader__.load({
           rows.map((entry, index) => h('div', { className: 'dsh-pl-fact', key: index },
             h('span', { className: 'dsh-pl-fact-label' }, entry.label),
             h('span', { className: 'dsh-pl-fact-value' }, entry.value))),
+          tags && tags.length
+            ? h('div', { className: 'dsh-pl-fact' },
+              h('span', { className: 'dsh-pl-fact-label' }, options.tagLabel),
+              h('span', { className: 'dsh-pl-tags' }, tags.map((tag, index) => h('span', { className: 'dsh-pl-tag', key: index }, tag))))
+            : null,
           note ? h('p', { className: 'dsh-pl-note' }, note) : null,
           children || null,
           actions && actions.length ? h('div', { className: 'dsh-pl-actions' }, actions) : null))
@@ -743,6 +806,7 @@ window.__ModuleLoader__.load({
       const [marketQuery, setMarketQuery] = React.useState('')
       const [searchResult, setSearchResult] = React.useState(null)
       const [searchStatus, setSearchStatus] = React.useState('')
+      const [searchSort, setSearchSort] = React.useState('relevance')
       const [trendError, setTrendError] = React.useState('')
       const [hotStatus, setHotStatus] = React.useState('')
       const [plugins, setPlugins] = React.useState([])
@@ -1203,7 +1267,7 @@ window.__ModuleLoader__.load({
                     key: row.repo || row.name || index,
                     icon: row.icon ? h('img', { src: row.icon, alt: '', draggable: false }) : null,
                     title: row.name,
-                    subtitle: row.summary || row.category || '',
+                    subtitle: row.summary || row.categoryZh || row.category || '',
                     className: 'is-market',
                     badge: h('span', { className: 'dsh-pl-delta' }, `+${row.delta.toLocaleString()}`),
                     onClick: () => setSelectedMarket(row),
@@ -1213,7 +1277,7 @@ window.__ModuleLoader__.load({
 
       const searchTimer = React.useRef(null)
 
-      const runMarketSearch = React.useCallback((query) => {
+      const runMarketSearch = React.useCallback((query, sort) => {
         const call = props.searchCatalog
         if (typeof call !== 'function') return
         if (!query.trim()) {
@@ -1222,7 +1286,7 @@ window.__ModuleLoader__.load({
           return
         }
         setSearchStatus('loading')
-        Promise.resolve(call({ query })).then((result) => {
+        Promise.resolve(call({ query, sort: sort || 'relevance' })).then((result) => {
           if (result && result.ok === false) {
             setSearchResult(null)
             setSearchStatus('error')
@@ -1235,12 +1299,20 @@ window.__ModuleLoader__.load({
           setSearchResult(null)
           setSearchStatus('error')
         })
-      }, [props.searchCatalog])
+      }, [props.searchCatalog, searchSort])
 
       function onMarketQuery(value) {
         setMarketQuery(value)
         if (searchTimer.current) clearTimeout(searchTimer.current)
-        searchTimer.current = setTimeout(() => runMarketSearch(value), 300)
+        searchTimer.current = setTimeout(() => runMarketSearch(value, searchSort), 300)
+      }
+
+      function featuredView() {
+        return h('div', { className: 'dsh-pl-market' },
+          h('div', { className: 'dsh-pl-featured' },
+            h('p', { className: 'dsh-pl-featured-lead' }, textOf(t, 'list.featuredLead')),
+            h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.featuredPending')),
+            h('p', { className: 'dsh-pl-featured-contact' }, withAccent(textOf(t, 'list.featuredContact'), 'ruskacoffee'))))
       }
 
       function marketDetail(row) {
@@ -1253,7 +1325,7 @@ window.__ModuleLoader__.load({
             ? { label: textOf(t, 'list.hotStars'), value: row.stars.toLocaleString() }
             : null,
           row.version ? { label: textOf(t, 'list.version'), value: row.version } : null,
-          row.category ? { label: textOf(t, 'list.hotCategory'), value: row.category } : null,
+          row.categoryZh || row.category ? { label: textOf(t, 'list.hotCategory'), value: row.categoryZh || row.category } : null,
           row.repo ? { label: textOf(t, 'list.hotRepo'), value: row.repo } : null,
           { label: textOf(t, 'list.status'), value: installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled') },
         ].filter(Boolean)
@@ -1262,6 +1334,8 @@ window.__ModuleLoader__.load({
           closeLabel: textOf(t, 'list.close'),
           onClose: () => setSelectedMarket(null),
           facts,
+          tags: Array.isArray(row.keywords) ? row.keywords : [],
+          tagLabel: textOf(t, 'list.tags'),
           note: row.summary || '',
           actions: [hotAction(row)],
         })
@@ -1295,14 +1369,22 @@ window.__ModuleLoader__.load({
                   ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketNoMatch'))
                   : h('div', null,
                     h('div', { className: 'dsh-pl-block-head' },
-                      h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(items.length)))),
+                      h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(items.length))),
+                      h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'sort' },
+                        chip('relevance', textOf(t, 'list.sortRelevance'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }),
+                        chip('hot', textOf(t, 'list.sortHot'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }),
+                        chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }))),
                     h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                       items.map((row, index) => h(PluginCard, {
                         key: row.name || index,
                         icon: null,
                         title: row.name,
-                        subtitle: row.summary || row.category || '',
+                        subtitle: row.summary || row.categoryZh || row.category || '',
                         className: 'is-market',
+                        badge: (() => {
+                          const metric = marketMetric(row)
+                          return metric ? h('span', { className: 'dsh-pl-metric', title: metric.title }, metric.text) : null
+                        })(),
                         onClick: () => setSelectedMarket(row),
                         actions: [hotAction(row)],
                       })))))
@@ -1347,9 +1429,10 @@ window.__ModuleLoader__.load({
         h('header', { className: 'dsh-pl-bar' },
           h('div', { className: 'dsh-pl-tools' },
             h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'filter' },
-              chip('installed', textOf(t, 'list.installed'), surface === 'market' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
-              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
-              chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market'))),
+              chip('installed', textOf(t, 'list.installed'), surface === 'market' || surface === 'featured' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' || surface === 'featured' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market')),
+              chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => setSurface('featured'))),
             h('button', {
               type: 'button',
               className: 'dsh-pl-refresh',
@@ -1367,7 +1450,9 @@ window.__ModuleLoader__.load({
               chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
               chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) })),
             h('span', { className: 'dsh-pl-version' }, VERSION))),
-        surface === 'market'
+        surface === 'featured'
+          ? featuredView()
+          : surface === 'market'
           ? selectedMarket ? marketDetail(selectedMarket) : marketView()
           : status === 'loading' && plugins.length === 0
           ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.loading'))
@@ -1490,6 +1575,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-detail-head img, .dsh-pl-detail-head .dsh-pl-fallback { width: 32px; height: 32px; }
 .dsh-pl-fact { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); column-gap: 12px; align-items: start; margin: 0 0 10px; }
 .dsh-pl-fact-label { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-sm); line-height: 1.45; }
+.dsh-pl-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.dsh-pl-tag { padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-fact-value { color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
 .dsh-pl-detail h3 { margin: 14px 0 6px; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-detail p, .dsh-pl-doc { margin: 0 0 8px; font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
@@ -1508,6 +1595,11 @@ window.__ModuleLoader__.load({
 .dsh-pl-md td:first-child { white-space: nowrap; }
 .dsh-pl-md tr:last-child td { border-bottom: 0; }
 .dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
+.dsh-pl-featured { padding: 18px 20px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
+.dsh-pl-featured-lead { margin: 0 0 6px; font-size: var(--pl-fs-md); line-height: 1.7; color: var(--dsw-alias-label-primary); }
+.dsh-pl-featured .dsh-pl-note { margin: 0; line-height: 1.7; }
+.dsh-pl-featured-contact { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
+.dsh-pl-accent { color: var(--dsw-alias-brand-primary); font-weight: 600; }
 .dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
@@ -1523,6 +1615,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-search { width: 100%; margin: 2px 0 8px; padding: 8px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); }
 .dsh-pl-search::placeholder { color: var(--dsw-alias-label-secondary); }
 .dsh-pl-search:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }
+.dsh-pl-metric { flex: none; margin-left: auto; padding-left: 8px; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .dsh-pl-delta { flex: none; margin-left: auto; font-size: var(--pl-fs-sm); font-weight: 600; color: var(--dsw-alias-brand-primary); }
 .dsh-pl-busy { flex: none; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-hot-busy { flex: none; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
