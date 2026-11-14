@@ -19,7 +19,10 @@
     "locale/*.json",
     "docs/DETAIL.md",
     "docs/DETAIL.zh.md",
-    "docs/screenshot.png",
+    "docs/screenshot.jpg",
+    "docs/screenshot-search.jpg",
+    "docs/screenshot-trend.jpg",
+    "docs/screenshot-daily.jpg",
     "icon.svg",
     "README.md"
   ],
