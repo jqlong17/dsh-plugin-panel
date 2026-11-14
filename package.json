@@ -59,9 +59,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jqlong17/dsh-plugins-ui.git"
+    "url": "git+https://github.com/jqlong17/dsh-plugin-panel.git"
   },
-  "homepage": "https://github.com/jqlong17/dsh-plugins-ui#readme",
+  "homepage": "https://github.com/jqlong17/dsh-plugin-panel#readme",
   "bugs": {
     "url": "https://github.com/jqlong17/dsh-plugins-ui/issues"
   }
