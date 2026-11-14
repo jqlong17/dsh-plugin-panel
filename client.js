@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.5'
+    const VERSION = 'v0.1.6'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -687,6 +687,26 @@ window.__ModuleLoader__.load({
       ]
     }
 
+    /** Turn a repository field into a link, tolerating the shapes npm allows. */
+    function repoLinkOf(value) {
+      const text = String(value || '').trim()
+      if (!text) return text
+      let url = ''
+      if (/^git\+https?:\/\//i.test(text)) url = text.replace(/^git\+/, '')
+      else if (/^https?:\/\//i.test(text)) url = text
+      else if (/^git@github\.com:/i.test(text)) url = `https://github.com/${text.replace(/^git@github\.com:/i, '')}`
+      else if (/^[\w.-]+\/[\w.-]+$/.test(text)) url = `https://github.com/${text}`
+      if (!url) return text
+      const href = url.replace(/\.git$/, '')
+      return h('a', {
+        className: 'dsh-pl-link',
+        href,
+        target: '_blank',
+        rel: 'noreferrer noopener',
+        onClick: (event) => event.stopPropagation(),
+      }, text.replace(/^git\+/, ''))
+    }
+
     function compactNumber(value) {
       const n = Number(value) || 0
       if (n >= 10000) return `${(n / 1000).toFixed(1)}k`
@@ -1109,7 +1129,7 @@ window.__ModuleLoader__.load({
           { label: textOf(t, 'list.flags'), value: flags },
           { label: textOf(t, 'list.components'), value: componentText },
           { label: textOf(t, 'list.license'), value: manifest && manifest.license },
-          { label: textOf(t, 'list.repo'), value: manifest && manifest.repository },
+          { label: textOf(t, 'list.repo'), value: repoLinkOf(manifest && manifest.repository) },
           { label: textOf(t, 'list.engines'), value: manifest && manifest.engines },
           { label: textOf(t, 'list.keywords'), value: manifest && Array.isArray(manifest.keywords) ? manifest.keywords.join('、') : '' },
           { label: textOf(t, 'list.inject'), value: manifest && Array.isArray(manifest.clientInject) ? manifest.clientInject.join('、') : '' },
@@ -1395,7 +1415,7 @@ window.__ModuleLoader__.load({
             : null,
           row.version ? { label: textOf(t, 'list.version'), value: row.version } : null,
           row.categoryZh || row.category ? { label: textOf(t, 'list.hotCategory'), value: row.categoryZh || row.category } : null,
-          row.repo ? { label: textOf(t, 'list.hotRepo'), value: row.repo } : null,
+          row.repo ? { label: textOf(t, 'list.hotRepo'), value: repoLinkOf(row.repo) } : null,
           { label: textOf(t, 'list.status'), value: installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled') },
         ].filter(Boolean)
         return h(DetailPanel, {
@@ -1666,6 +1686,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-fact-label { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-sm); line-height: 1.45; }
 .dsh-pl-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .dsh-pl-tag { padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
+.dsh-pl-link { color: var(--dsw-alias-brand-primary); text-decoration: none; }
+.dsh-pl-link:hover { text-decoration: underline; }
 .dsh-pl-fact-value { color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
 .dsh-pl-detail h3 { margin: 14px 0 6px; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-detail p, .dsh-pl-doc { margin: 0 0 8px; font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
