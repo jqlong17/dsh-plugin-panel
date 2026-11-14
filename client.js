@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.2'
+    const VERSION = 'v0.1.3'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -16,7 +16,6 @@ window.__ModuleLoader__.load({
         'guide.description': '查看并打开右侧栏插件。',
         'list.installed': '用户安装',
         'list.builtin': '系统内置',
-        'list.all': '全部',
         'list.refresh': '刷新',
         'list.market': '市场',
         'list.back': '返回',
@@ -28,6 +27,34 @@ window.__ModuleLoader__.load({
         'list.countFiltered': '已过滤',
         'list.perDay': '日均新增',
         'list.spanDays': '覆盖天数',
+        'list.marketFirstNote': '首日已含此前录入的存量，不是从 0 开始',
+        'list.install': '安装',
+        'list.uninstall': '卸载',
+        'list.uninstallConfirm': '确认卸载',
+        'list.installing': '安装中…',
+        'list.removing': '卸载中…',
+        'list.hotDelta': '7 天增长',
+        'list.hotStars': '仓库 star',
+        'list.hotCategory': '分类',
+        'list.hotRepo': '仓库',
+        'list.installedState': '已安装',
+        'list.notInstalled': '未安装',
+        'list.chartTitle': '插件市场的增长趋势',
+        'list.chartCumulative': '累计',
+        'list.chartDaily': '每日增量',
+        'list.chartDailyHint': '每天新增多少，比累计更能看出快慢',
+        'list.marketSearch': '搜索整个市场的插件…',
+        'list.marketSearching': '搜索中…',
+        'list.searchError': '搜索暂时不可用。如果刚更新过插件，在插件管理里停用再启用一次即可。',
+        'list.marketNoMatch': '没有找到匹配的插件',
+        'list.marketHits': '找到 {n} 个',
+        'list.hotSearch': '搜索插件名、说明或分类…',
+        'list.hotNoMatch': '没有匹配的插件',
+        'list.hotTitle': '最近 7 天增长最快',
+        'list.hotHint': '按 GitHub 仓库 star 的 7 天增量排序，同一仓库只算一次。',
+        'list.hotLoading': '正在算增长…',
+        'list.hotError': '取不到增长数据。如果刚更新插件，需要重启一次 DeepSeek Harness 才会启用这个榜单。',
+        'list.hotEmpty': '这 7 天没有增长记录。',
         'list.viewList': '列表',
         'list.viewCard': '卡片',
         'list.open': '打开',
@@ -89,7 +116,6 @@ window.__ModuleLoader__.load({
         'guide.description': 'Browse and open right-sidebar plugins.',
         'list.installed': 'Installed',
         'list.builtin': 'Built-in',
-        'list.all': 'All',
         'list.refresh': 'Refresh',
         'list.market': 'Market',
         'list.back': 'Back',
@@ -101,6 +127,34 @@ window.__ModuleLoader__.load({
         'list.countFiltered': 'Filtered',
         'list.perDay': 'Per day',
         'list.spanDays': 'Days',
+        'list.marketFirstNote': 'First point already includes earlier stock; not growth from zero',
+        'list.install': 'Install',
+        'list.uninstall': 'Remove',
+        'list.uninstallConfirm': 'Confirm',
+        'list.installing': 'Installing…',
+        'list.removing': 'Removing…',
+        'list.hotDelta': '7-day growth',
+        'list.hotStars': 'Repo stars',
+        'list.hotCategory': 'Category',
+        'list.hotRepo': 'Repository',
+        'list.installedState': 'Installed',
+        'list.notInstalled': 'Not installed',
+        'list.chartTitle': 'Plugin market growth',
+        'list.chartCumulative': 'Total',
+        'list.chartDaily': 'Per day',
+        'list.chartDailyHint': 'New plugins per day, which shows pace better than a total',
+        'list.marketSearch': 'Search the whole market…',
+        'list.marketSearching': 'Searching…',
+        'list.searchError': 'Search is unavailable. If you just updated the plugin, disable and re-enable it once.',
+        'list.marketNoMatch': 'No matching plugin',
+        'list.marketHits': '{n} found',
+        'list.hotSearch': 'Search by name, description or category…',
+        'list.hotNoMatch': 'No matching plugin',
+        'list.hotTitle': 'Fastest growing, last 7 days',
+        'list.hotHint': 'Ranked by 7-day GitHub repository star delta; one row per repository.',
+        'list.hotLoading': 'Crunching growth…',
+        'list.hotError': 'Could not load growth data. Restart DeepSeek Harness once to enable this ranking.',
+        'list.hotEmpty': 'No growth recorded in the last 7 days.',
         'list.viewList': 'List',
         'list.viewCard': 'Cards',
         'list.open': 'Open',
@@ -171,7 +225,7 @@ window.__ModuleLoader__.load({
       try {
         const parsed = JSON.parse(window.localStorage.getItem(PREF_KEY) || '{}')
         return {
-          filter: ['installed', 'builtin', 'all'].includes(parsed.filter) ? parsed.filter : 'installed',
+          filter: parsed.filter === 'builtin' ? 'builtin' : 'installed',
           pins: Array.isArray(parsed.pins) ? parsed.pins.filter((id) => typeof id === 'string') : [],
           layout: parsed.layout === 'card' ? 'card' : 'list',
         }
@@ -273,15 +327,97 @@ window.__ModuleLoader__.load({
       return ''
     }
 
-    function trendChart(days) {
+    /** Bars for the day-over-day change; the first day has no previous snapshot. */
+    function barChart(days, hoverIndex, onHover) {
       const W = 1000
-      const H = 340
-      const L = 76
-      const R = 28
-      const T = 24
-      const B = 52
+      const H = 250
+      const L = 68
+      const R = 24
+      const T = 18
+      const B = 42
+      const deltas = days.map((day, index) => (index === 0 ? null : day.count - days[index - 1].count))
+      const usable = deltas.filter((value) => typeof value === 'number')
+      const peak = Math.max(...usable, 1) * 1.15
+      const n = days.length
+      const slot = (W - L - R) / Math.max(n, 1)
+      const barW = Math.max(2, Math.min(slot * 0.62, 14))
+      const x = (i) => L + slot * i + slot / 2
+      const zeroY = T + (H - T - B)
+      const y = (v) => zeroY - ((H - T - B) * v) / Math.max(peak, 1)
+      const ticks = [0, 0.5, 1].map((r) => Math.round((peak * r) / 500) * 500)
+      const labelIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1]
+
+      const pick = (event) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        if (!rect.width) return
+        const px = ((event.clientX - rect.left) / rect.width) * W
+        const index = Math.round((px - L - slot / 2) / Math.max(slot, 1))
+        onHover(Math.max(0, Math.min(n - 1, index)))
+      }
+
+      const hovered = hoverIndex >= 0 && hoverIndex < n ? hoverIndex : -1
+      const hx = hovered >= 0 ? x(hovered) : 0
+      const value = hovered >= 0 ? deltas[hovered] : null
+      const boxW = 200
+      const boxH = 64
+      const boxX = hovered >= 0 ? Math.min(Math.max(hx - boxW / 2, L), W - R - boxW) : 0
+      const boxY = hovered >= 0 ? Math.max(T + 8, y(typeof value === 'number' ? value : 0) - boxH - 14) : 0
+      const shown = typeof value === 'number' ? `${value >= 0 ? '+' : ''}${value.toLocaleString()}` : '—'
+
+      return h('svg', {
+        className: 'dsh-pl-chart',
+        viewBox: `0 0 ${W} ${H}`,
+        role: 'img',
+        onMouseMove: pick,
+        onMouseLeave: () => onHover(-1),
+      },
+        ticks.map((tick, i) => h('line', {
+          key: `g${i}`, x1: L, x2: W - R, y1: y(tick), y2: y(tick),
+          stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 1,
+        })),
+        ticks.map((tick, i) => h('text', {
+          key: `t${i}`, x: L - 12, y: y(tick) + 6, textAnchor: 'end',
+          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
+        }, `+${Math.round(tick / 1000)}k`)),
+        deltas.map((delta, i) => {
+          if (typeof delta !== 'number') return null
+          const top = Math.min(y(delta), zeroY)
+          const height = Math.max(1, Math.abs(zeroY - y(delta)))
+          return h('rect', {
+            key: `b${i}`, x: x(i) - barW / 2, y: top, width: barW, height,
+            rx: Math.min(2, barW / 2),
+            fill: 'var(--dsw-alias-brand-primary)',
+            opacity: hovered === i ? 0.95 : 0.55,
+          })
+        }),
+        labelIndexes.map((i) => h('text', {
+          key: `d${i}`, x: x(i), y: H - B + 34, textAnchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
+          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
+        }, days[i].day.slice(5))),
+        hovered >= 0 ? h('g', null,
+          h('line', {
+            x1: hx, x2: hx, y1: T, y2: H - B,
+            stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.5,
+          }),
+          h('rect', {
+            x: boxX, y: boxY, width: boxW, height: boxH, rx: 10,
+            fill: 'var(--dsw-alias-bg-overlay)', stroke: 'var(--dsw-alias-border-l2)', strokeWidth: 1,
+          }),
+          h('text', { x: boxX + 14, y: boxY + 24, fill: 'var(--dsw-alias-label-secondary)', fontSize: 16 }, days[hovered].day),
+          h('text', { x: boxX + 14, y: boxY + 50, fill: 'var(--dsw-alias-label-primary)', fontSize: 22, fontWeight: 600 }, shown),
+        ) : null,
+      )
+    }
+
+    function trendChart(days, hoverIndex, onHover, firstNote) {
+      const W = 1000
+      const H = 250
+      const L = 68
+      const R = 24
+      const T = 18
+      const B = 42
       const values = days.map((d) => d.count)
-      const max = Math.max(...values, 1) * 1.04
+      const max = Math.max(...values, 1) * 1.2
       const n = days.length
       const x = (i) => L + (W - L - R) * (n <= 1 ? 0.5 : i / (n - 1))
       const y = (v) => T + (H - T - B) * (1 - v / max)
@@ -289,25 +425,68 @@ window.__ModuleLoader__.load({
       const area = `${line} L ${x(n - 1).toFixed(1)} ${H - B} L ${x(0).toFixed(1)} ${H - B} Z`
       const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) => Math.round((max * r) / 1000) * 1000)
       const labelIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1]
-      return h('svg', { className: 'dsh-pl-chart', viewBox: `0 0 ${W} ${H}`, role: 'img' },
+
+      const pick = (event) => {
+        const rect = event.currentTarget.getBoundingClientRect()
+        if (!rect.width) return
+        const px = ((event.clientX - rect.left) / rect.width) * W
+        const ratio = (px - L) / Math.max(W - L - R, 1)
+        const index = Math.round(ratio * Math.max(n - 1, 1))
+        onHover(Math.max(0, Math.min(n - 1, index)))
+      }
+
+      const hovered = hoverIndex >= 0 && hoverIndex < n ? hoverIndex : -1
+      const hx = hovered >= 0 ? x(hovered) : 0
+      const hy = hovered >= 0 ? y(values[hovered]) : 0
+      const isFirst = hovered === 0
+      const boxW = isFirst ? 246 : 196
+      const boxH = isFirst ? 96 : 64
+      const boxX = hovered >= 0 ? Math.min(Math.max(hx - boxW / 2, L), W - R - boxW) : 0
+      const boxY = hovered >= 0 ? Math.max(hy - boxH - 16, T) : 0
+
+      return h('svg', {
+        className: 'dsh-pl-chart',
+        viewBox: `0 0 ${W} ${H}`,
+        role: 'img',
+        onMouseMove: pick,
+        onMouseLeave: () => onHover(-1),
+      },
         ticks.map((tick, i) => h('line', {
           key: `g${i}`, x1: L, x2: W - R, y1: y(tick), y2: y(tick),
           stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 1,
         })),
         ticks.map((tick, i) => h('text', {
           key: `t${i}`, x: L - 12, y: y(tick) + 6, textAnchor: 'end',
-          fill: 'var(--dsw-alias-label-secondary)', fontSize: 20,
+          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
         }, `${Math.round(tick / 1000)}k`)),
-        h('path', { d: area, fill: 'var(--dsw-alias-brand-primary)', opacity: 0.12 }),
-        h('path', { d: line, fill: 'none', stroke: 'var(--dsw-alias-brand-primary)', strokeWidth: 4, strokeLinejoin: 'round' }),
+        h('path', { d: area, fill: 'var(--dsw-alias-brand-primary)', opacity: 0.08 }),
+        h('path', { d: line, fill: 'none', stroke: 'var(--dsw-alias-brand-primary)', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
         labelIndexes.map((i) => h('text', {
           key: `d${i}`, x: x(i), y: H - B + 34, textAnchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
-          fill: 'var(--dsw-alias-label-secondary)', fontSize: 20,
+          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
         }, days[i].day.slice(5))),
         h('text', {
           x: x(n - 1), y: y(values[n - 1]) - 16, textAnchor: 'end',
-          fill: 'var(--dsw-alias-label-primary)', fontSize: 26, fontWeight: 600,
+          fill: 'var(--dsw-alias-label-primary)', fontSize: 22, fontWeight: 600,
         }, String(values[n - 1])),
+        hovered >= 0 ? h('g', null,
+          h('line', {
+            x1: hx, x2: hx, y1: T, y2: H - B,
+            stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.5,
+          }),
+          h('circle', { cx: hx, cy: hy, r: 4.5, fill: 'var(--dsw-alias-brand-primary)', stroke: '#fff', strokeWidth: 2 }),
+          h('rect', {
+            x: boxX, y: boxY, width: boxW, height: boxH, rx: 10,
+            fill: 'var(--dsw-alias-bg-overlay)', stroke: 'var(--dsw-alias-border-l2)', strokeWidth: 1,
+          }),
+          h('text', { x: boxX + 14, y: boxY + 24, fill: 'var(--dsw-alias-label-secondary)', fontSize: 16 },
+            days[hovered].day),
+          h('text', { x: boxX + 14, y: boxY + 50, fill: 'var(--dsw-alias-label-primary)', fontSize: 22, fontWeight: 600 },
+            `${values[hovered].toLocaleString()} 个`),
+          isFirst && firstNote
+            ? h('text', { x: boxX + 14, y: boxY + 78, fill: 'var(--dsw-alias-label-secondary)', fontSize: 14 }, firstNote)
+            : null,
+        ) : null,
       )
     }
 
@@ -468,6 +647,49 @@ window.__ModuleLoader__.load({
       }) || null
     }
 
+    /** One card shape, shared by the plugin list and the market ranking. */
+    function PluginCard(options) {
+      const { icon, title, subtitle, actions, className, onClick, badge } = options
+      const classes = ['dsh-pl-item']
+      if (className) classes.push(className)
+      return h('div', {
+        className: classes.join(' '),
+        role: 'button',
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            if (onClick) onClick()
+          }
+        },
+      },
+      icon || h(DefaultPluginIcon),
+      h('span', { className: 'dsh-pl-copy' },
+        h('strong', null, title),
+        subtitle ? h('span', { className: 'dsh-pl-where' }, subtitle) : null),
+      badge || null,
+      actions && actions.length ? h('div', { className: 'dsh-pl-acts' }, actions) : null)
+    }
+
+    /** One detail shape, shared by the plugin detail and the market detail. */
+    function DetailPanel(options) {
+      const { icon, title, facts, onClose, closeLabel, actions, note, children } = options
+      const rows = (facts || []).filter((entry) => entry && entry.value)
+      return h('aside', { className: 'dsh-pl-detail' },
+        h('div', { className: 'dsh-pl-detail-head' },
+          icon || h(DefaultPluginIcon),
+          h('strong', null, title),
+          h('button', { type: 'button', onClick: onClose }, closeLabel)),
+        h('div', { className: 'dsh-pl-detail-body' },
+          rows.map((entry, index) => h('div', { className: 'dsh-pl-fact', key: index },
+            h('span', { className: 'dsh-pl-fact-label' }, entry.label),
+            h('span', { className: 'dsh-pl-fact-value' }, entry.value))),
+          note ? h('p', { className: 'dsh-pl-note' }, note) : null,
+          children || null,
+          actions && actions.length ? h('div', { className: 'dsh-pl-actions' }, actions) : null))
+    }
+
     function DefaultPluginIcon() {
       return h('svg', {
         className: 'dsh-pl-fallback',
@@ -510,6 +732,19 @@ window.__ModuleLoader__.load({
       const [surface, setSurface] = React.useState('plugins')
       const [trend, setTrend] = React.useState(null)
       const [trendStatus, setTrendStatus] = React.useState('')
+      const [hoverIndex, setHoverIndex] = React.useState(-1)
+      const [hot, setHot] = React.useState(null)
+      const [hotError, setHotError] = React.useState('')
+      const [busyKey, setBusyKey] = React.useState('')
+      const [confirmKey, setConfirmKey] = React.useState('')
+      const [selectedMarket, setSelectedMarket] = React.useState(null)
+      const [chartMode, setChartMode] = React.useState('cumulative')
+      const [hotQuery, setHotQuery] = React.useState('')
+      const [marketQuery, setMarketQuery] = React.useState('')
+      const [searchResult, setSearchResult] = React.useState(null)
+      const [searchStatus, setSearchStatus] = React.useState('')
+      const [trendError, setTrendError] = React.useState('')
+      const [hotStatus, setHotStatus] = React.useState('')
       const [plugins, setPlugins] = React.useState([])
       const [bundles, setBundles] = React.useState([])
       const [status, setStatus] = React.useState(listPlugins ? 'loading' : 'unavailable')
@@ -635,33 +870,100 @@ window.__ModuleLoader__.load({
         return () => { cancelled = true }
       }, [selectedId, plugins, bundles, loadFacts])
 
+      const MARKET_CACHE_KEY = 'dsh.plugin-list.market.v1'
+
+      function todayKey() {
+        return new Date().toISOString().slice(0, 10)
+      }
+
+      function readMarketCache() {
+        try {
+          const raw = JSON.parse(window.localStorage.getItem(MARKET_CACHE_KEY) || '{}')
+          return raw && raw.day === todayKey() ? raw : null
+        } catch {
+          return null
+        }
+      }
+
+      function writeMarketCache(patch) {
+        try {
+          const raw = readMarketCache() || { day: todayKey() }
+          window.localStorage.setItem(MARKET_CACHE_KEY, JSON.stringify({ ...raw, ...patch }))
+        } catch { /* caching is best effort */ }
+      }
+
       const loadTrend = React.useCallback(async () => {
-        if (typeof loadMarketTrend !== 'function') return
+        const cached = readMarketCache()
+        if (cached && cached.trend) {
+          setTrend(cached.trend)
+          setTrendStatus('ready')
+          return
+        }
+        const call = props.loadMarketTrend
+        if (typeof call !== 'function') return
         setTrendStatus('loading')
         try {
-          const result = await loadMarketTrend()
+          const result = await call()
+          if (result && result.ok === false) {
+            setTrendError((result.error && result.error.message) || '')
+            setTrendStatus('error')
+            return
+          }
           const value = result && result.ok === true ? result.value : result
           if (value && Array.isArray(value.days) && value.days.length) {
             setTrend(value)
+            writeMarketCache({ trend: value })
             setTrendStatus('ready')
           } else {
             setTrendStatus('error')
           }
-        } catch {
+        } catch (failure) {
+          setTrendError(failure instanceof Error ? failure.message : '')
           setTrendStatus('error')
         }
-      }, [loadMarketTrend])
+      }, [props.loadMarketTrend])
+
+      const loadHot = React.useCallback(async () => {
+        const cached = readMarketCache()
+        if (cached && cached.hot) {
+          setHot(cached.hot)
+          setHotStatus('ready')
+          return
+        }
+        const call = props.loadMarketHot
+        if (typeof call !== 'function') return
+        setHotStatus('loading')
+        try {
+          const result = await call()
+          if (result && result.ok === false) {
+            setHotError((result.error && result.error.message) || '')
+            setHotStatus('error')
+            return
+          }
+          const value = result && result.ok === true ? result.value : result
+          if (value && Array.isArray(value.top) && value.top.length) {
+            setHot(value)
+            writeMarketCache({ hot: value })
+            setHotStatus('ready')
+          } else {
+            setHotStatus('empty')
+          }
+        } catch (failure) {
+          setHotError(failure instanceof Error ? failure.message : '')
+          setHotStatus('error')
+        }
+      }, [props.loadMarketHot])
 
       React.useEffect(() => {
-        if (surface === 'market' && trendStatus === '') void loadTrend()
-      }, [surface, trendStatus, loadTrend])
+        if (surface !== 'market') return
+        if (trendStatus === '') void loadTrend()
+        if (hotStatus === '') void loadHot()
+      }, [surface, trendStatus, hotStatus, loadTrend, loadHot])
 
       const visible = React.useMemo(() => {
         const rows = plugins.filter((plugin) => {
           const origin = originOf(plugin)
-          if (filter === 'installed') return origin === 'installed'
-          if (filter === 'builtin') return origin === 'builtin'
-          return true
+          return filter === 'builtin' ? origin === 'builtin' : origin === 'installed'
         })
         const rank = (plugin) => {
           const places = placesFor(plugin, guide, seats, localeId)
@@ -680,13 +982,6 @@ window.__ModuleLoader__.load({
 
       const selected = plugins.find((item) => item.entryId === selectedId) || null
       const selectedBundle = selected ? matchBundle(selected, bundles) : null
-
-      function fact(label, value) {
-        if (!value) return null
-        return h('div', { className: 'dsh-pl-fact' },
-          h('span', { className: 'dsh-pl-fact-label' }, label),
-          h('span', { className: 'dsh-pl-fact-value' }, value))
-      }
 
       function revealHint(text) {
         const raw = String(text || '')
@@ -722,64 +1017,73 @@ window.__ModuleLoader__.load({
         const componentText = rows.length
           ? `${rows.length}${siblings.length ? ` · ${siblings.join('、')}${rows.length > 7 ? '…' : ''}` : ''}`
           : ''
-        return h('aside', { className: 'dsh-pl-detail' },
-          h('div', { className: 'dsh-pl-detail-head' },
-            icon ? h('img', { src: icon, alt: '' }) : h(DefaultPluginIcon),
-            h('strong', null, title),
-            h('button', { type: 'button', onClick: () => setSelectedId('') }, textOf(t, 'list.close'))),
-          h('div', { className: 'dsh-pl-detail-body' },
-            fact(textOf(t, 'list.intro'), intro || textOf(t, 'list.unknown')),
-            fact(textOf(t, 'list.module'), shortModule(plugin.moduleName)),
-            fact(textOf(t, 'list.entry'), plugin.entryId),
-            fact(textOf(t, 'list.status'), textOf(t, phaseKey(plugin))),
-            fact(textOf(t, 'list.package'), (selectedBundle && selectedBundle.name) || (manifest && manifest.name) || shortModule(plugin.moduleName)),
-            fact(textOf(t, 'list.version'), (selectedBundle && selectedBundle.version) || (manifest && manifest.version)),
-            fact(textOf(t, 'list.place'), place),
-            fact(textOf(t, 'list.source'), source),
-            fact(textOf(t, 'list.flags'), flags),
-            fact(textOf(t, 'list.components'), componentText),
-            fact(textOf(t, 'list.license'), manifest && manifest.license),
-            fact(textOf(t, 'list.repo'), manifest && manifest.repository),
-            fact(textOf(t, 'list.engines'), manifest && manifest.engines),
-            fact(textOf(t, 'list.keywords'), manifest && Array.isArray(manifest.keywords) ? manifest.keywords.join('、') : ''),
-            fact(textOf(t, 'list.inject'), manifest && Array.isArray(manifest.clientInject) ? manifest.clientInject.join('、') : ''),
-            h('section', { className: 'dsh-pl-doc-block' },
-              h('div', { className: 'dsh-pl-fact-label' }, textOf(t, 'list.doc')),
-              readmeStatus === 'loading'
-                ? h('p', null, textOf(t, 'list.docLoading'))
-                : (readme || (facts && facts.document))
-                  ? markdownView(readme || facts.document)
-                  : h('p', null, textOf(t, 'list.docEmpty'))),
-            h('div', { className: 'dsh-pl-actions' },
-              tabKindFor(plugin, guide, localeId) && typeof openPanel === 'function'
-                ? h('button', {
-                  type: 'button',
-                  onClick: () => openPanel(tabKindFor(plugin, guide, localeId)),
-                }, textOf(t, 'list.open'))
-                : null,
-              typeof props.revealPackage === 'function'
-                ? h('button', {
-                  type: 'button',
-                  onClick: () => {
-                    setRevealNote('')
-                    const source = selectedBundle && selectedBundle.source
-                    Promise.resolve(props.revealPackage({ moduleName: plugin.moduleName || '', source: source || '' })).then((result) => {
-                      if (result && result.ok === false) setRevealNote(revealHint(result.error && result.error.message))
-                    }).catch((failure) => {
-                      setRevealNote(revealHint(failure instanceof Error ? failure.message : ''))
-                    })
-                  },
-                }, textOf(t, 'list.reveal'))
-                : null,
-              plugin.patchId && plugin.readOnlyReason == null && setPluginEnabled
-                ? h('button', {
-                  type: 'button',
-                  onClick: () => { void setPluginEnabled(plugin.entryId, plugin.enabled !== true).then(() => load()) },
-                }, plugin.enabled ? textOf(t, 'list.disable') : textOf(t, 'list.enable'))
-                : plugin.readOnlyReason
-                  ? h('span', { className: 'dsh-pl-note' }, String(plugin.readOnlyReason))
-                  : h('span', { className: 'dsh-pl-note' }, textOf(t, 'list.locked')),
-              revealNote ? h('span', { className: 'dsh-pl-note' }, revealNote) : null)))
+        const detailFacts = [
+          { label: textOf(t, 'list.intro'), value: intro || textOf(t, 'list.unknown') },
+          { label: textOf(t, 'list.module'), value: shortModule(plugin.moduleName) },
+          { label: textOf(t, 'list.entry'), value: plugin.entryId },
+          { label: textOf(t, 'list.status'), value: textOf(t, phaseKey(plugin)) },
+          { label: textOf(t, 'list.package'), value: (selectedBundle && selectedBundle.name) || (manifest && manifest.name) || shortModule(plugin.moduleName) },
+          { label: textOf(t, 'list.version'), value: (selectedBundle && selectedBundle.version) || (manifest && manifest.version) },
+          { label: textOf(t, 'list.place'), value: place },
+          { label: textOf(t, 'list.source'), value: source },
+          { label: textOf(t, 'list.flags'), value: flags },
+          { label: textOf(t, 'list.components'), value: componentText },
+          { label: textOf(t, 'list.license'), value: manifest && manifest.license },
+          { label: textOf(t, 'list.repo'), value: manifest && manifest.repository },
+          { label: textOf(t, 'list.engines'), value: manifest && manifest.engines },
+          { label: textOf(t, 'list.keywords'), value: manifest && Array.isArray(manifest.keywords) ? manifest.keywords.join('、') : '' },
+          { label: textOf(t, 'list.inject'), value: manifest && Array.isArray(manifest.clientInject) ? manifest.clientInject.join('、') : '' },
+        ]
+
+        const detailActions = []
+        const openKind = tabKindFor(plugin, guide, localeId)
+        if (openKind && typeof openPanel === 'function') {
+          detailActions.push(h('button', {
+            key: 'open',
+            type: 'button',
+            onClick: () => openPanel(openKind),
+          }, textOf(t, 'list.open')))
+        }
+        if (typeof props.revealPackage === 'function') {
+          detailActions.push(h('button', {
+            key: 'reveal',
+            type: 'button',
+            onClick: () => {
+              setRevealNote('')
+              const source = selectedBundle && selectedBundle.source
+              Promise.resolve(props.revealPackage({ moduleName: plugin.moduleName || '', source: source || '' })).then((result) => {
+                if (result && result.ok === false) setRevealNote(revealHint(result.error && result.error.message))
+              }).catch((failure) => {
+                setRevealNote(revealHint(failure instanceof Error ? failure.message : ''))
+              })
+            },
+          }, textOf(t, 'list.reveal')))
+        }
+        if (plugin.patchId && plugin.readOnlyReason == null && setPluginEnabled) {
+          detailActions.push(h('button', {
+            key: 'toggle',
+            type: 'button',
+            onClick: () => { void setPluginEnabled(plugin.entryId, plugin.enabled !== true).then(() => load()) },
+          }, plugin.enabled ? textOf(t, 'list.disable') : textOf(t, 'list.enable')))
+        }
+        if (revealNote) detailActions.push(h('span', { key: 'note', className: 'dsh-pl-note' }, revealNote))
+        if (plugin.readOnlyReason) detailActions.push(h('span', { key: 'locked', className: 'dsh-pl-note' }, String(plugin.readOnlyReason)))
+
+        return h(DetailPanel, {
+          icon: icon ? h('img', { src: icon, alt: '' }) : null,
+          title,
+          closeLabel: textOf(t, 'list.close'),
+          onClose: () => setSelectedId(''),
+          facts: detailFacts,
+          actions: detailActions,
+          children: h('section', { className: 'dsh-pl-doc-block' },
+            h('div', { className: 'dsh-pl-fact-label' }, textOf(t, 'list.doc')),
+            readmeStatus === 'loading'
+              ? h('p', null, textOf(t, 'list.docLoading'))
+              : (readme || (facts && facts.document))
+                ? markdownView(readme || facts.document)
+                : h('p', null, textOf(t, 'list.docEmpty'))),
+        })
       }
 
       function togglePin(entryId) {
@@ -801,6 +1105,168 @@ window.__ModuleLoader__.load({
         }, label)
       }
 
+      function isInstalled(name) {
+        const target = String(name || '')
+        return plugins.some((plugin) => {
+          const moduleName = String(plugin.moduleName || '')
+          return moduleName === target || plugin.patchId === target || plugin.entryId === `include:${target}`
+        })
+      }
+
+      async function installFromMarket(name) {
+        if (typeof props.installBundle !== 'function' || busyKey) return
+        setBusyKey(name)
+        try {
+          const result = await props.installBundle(String(name))
+          const value = result && result.ok === true ? result.value : result
+          if (value && value.application === 'failed') {
+            setHotError((value.error && (value.error.diagnostic || value.error.code)) || '')
+          } else if (value && Array.isArray(value.pendingBuilds) && value.pendingBuilds.length) {
+            setHotError(`需要批准构建脚本：${value.pendingBuilds.join(', ')}`)
+          }
+          await load()
+        } catch (failure) {
+          setHotError(failure instanceof Error ? failure.message : '')
+        } finally {
+          setBusyKey('')
+        }
+      }
+
+      async function removeFromMarket(name) {
+        if (typeof props.removeBundle !== 'function' || busyKey) return
+        setBusyKey(name)
+        setConfirmKey('')
+        try {
+          const result = await props.removeBundle(String(name))
+          const value = result && result.ok === true ? result.value : result
+          if (value && value.application === 'failed') {
+            setHotError((value.error && (value.error.diagnostic || value.error.code)) || '')
+          }
+          await load()
+        } catch (failure) {
+          setHotError(failure instanceof Error ? failure.message : '')
+        } finally {
+          setBusyKey('')
+        }
+      }
+
+      function hotAction(row) {
+        const name = row.name
+        if (busyKey === name) {
+          return h('span', { className: 'dsh-pl-busy' }, isInstalled(name) ? textOf(t, 'list.removing') : textOf(t, 'list.installing'))
+        }
+        if (isInstalled(name)) {
+          return confirmKey === name
+            ? h('button', {
+              type: 'button',
+              className: 'dsh-pl-card-btn',
+              onClick: (event) => { event.stopPropagation(); void removeFromMarket(name) },
+            }, textOf(t, 'list.uninstallConfirm'))
+            : h('button', {
+              type: 'button',
+              className: 'dsh-pl-card-btn',
+              onClick: (event) => { event.stopPropagation(); setConfirmKey(name) },
+            }, textOf(t, 'list.uninstall'))
+        }
+        return h('button', {
+          type: 'button',
+          className: 'dsh-pl-card-btn',
+          onClick: (event) => { event.stopPropagation(); void installFromMarket(name) },
+        }, textOf(t, 'list.install'))
+      }
+
+      function hotView() {
+        const rows = hot && Array.isArray(hot.top) ? hot.top : []
+        const query = hotQuery.trim().toLowerCase()
+        const shown = query
+          ? rows.filter((row) => [row.name, row.summary, row.category]
+            .filter(Boolean)
+            .some((field) => String(field).toLowerCase().includes(query)))
+          : rows
+        return h('section', { className: 'dsh-pl-hot' },
+          h('div', { className: 'dsh-pl-block-head' },
+            h('strong', null, textOf(t, 'list.hotTitle')),
+            hot && hot.fromDay
+              ? h('span', null, rows.length === shown.length ? `${hot.fromDay} → ${hot.toDay}` : `${shown.length} / ${rows.length}`)
+              : null),
+          h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.hotHint')),
+          hotStatus === 'loading'
+            ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.hotLoading'))
+            : hotStatus === 'error'
+              ? h('p', { className: 'dsh-pl-state' }, hotError ? `${textOf(t, 'list.hotError')}（${hotError}）` : textOf(t, 'list.hotError'))
+              : rows.length === 0
+                ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.hotEmpty'))
+                : shown.length === 0
+                ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.hotNoMatch'))
+                : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
+                  shown.map((row, index) => h(PluginCard, {
+                    key: row.repo || row.name || index,
+                    icon: row.icon ? h('img', { src: row.icon, alt: '', draggable: false }) : null,
+                    title: row.name,
+                    subtitle: row.summary || row.category || '',
+                    className: 'is-market',
+                    badge: h('span', { className: 'dsh-pl-delta' }, `+${row.delta.toLocaleString()}`),
+                    onClick: () => setSelectedMarket(row),
+                    actions: [hotAction(row)],
+                  }))))
+      }
+
+      const searchTimer = React.useRef(null)
+
+      const runMarketSearch = React.useCallback((query) => {
+        const call = props.searchCatalog
+        if (typeof call !== 'function') return
+        if (!query.trim()) {
+          setSearchResult(null)
+          setSearchStatus('')
+          return
+        }
+        setSearchStatus('loading')
+        Promise.resolve(call({ query })).then((result) => {
+          if (result && result.ok === false) {
+            setSearchResult(null)
+            setSearchStatus('error')
+            return
+          }
+          const value = result && result.ok === true ? result.value : result
+          setSearchResult(value && Array.isArray(value.items) ? value.items : [])
+          setSearchStatus('ready')
+        }).catch(() => {
+          setSearchResult(null)
+          setSearchStatus('error')
+        })
+      }, [props.searchCatalog])
+
+      function onMarketQuery(value) {
+        setMarketQuery(value)
+        if (searchTimer.current) clearTimeout(searchTimer.current)
+        searchTimer.current = setTimeout(() => runMarketSearch(value), 300)
+      }
+
+      function marketDetail(row) {
+        const installed = isInstalled(row.name)
+        const facts = [
+          typeof row.delta === 'number'
+            ? { label: textOf(t, 'list.hotDelta'), value: `+${row.delta.toLocaleString()}` }
+            : null,
+          typeof row.stars === 'number'
+            ? { label: textOf(t, 'list.hotStars'), value: row.stars.toLocaleString() }
+            : null,
+          row.version ? { label: textOf(t, 'list.version'), value: row.version } : null,
+          row.category ? { label: textOf(t, 'list.hotCategory'), value: row.category } : null,
+          row.repo ? { label: textOf(t, 'list.hotRepo'), value: row.repo } : null,
+          { label: textOf(t, 'list.status'), value: installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled') },
+        ].filter(Boolean)
+        return h(DetailPanel, {
+          title: row.name,
+          closeLabel: textOf(t, 'list.close'),
+          onClose: () => setSelectedMarket(null),
+          facts,
+          note: row.summary || '',
+          actions: [hotAction(row)],
+        })
+      }
+
       function marketView() {
         const days = trend && Array.isArray(trend.days) ? trend.days : []
         const first = days[0]
@@ -809,22 +1275,63 @@ window.__ModuleLoader__.load({
           ? Math.max(1, Math.round((Date.parse(last.day) - Date.parse(first.day)) / 86400000))
           : 0
         const perDay = first && last ? Math.round((last.count - first.count) / Math.max(span, 1)) : 0
+        const query = marketQuery.trim()
+        const searchBox = h('input', {
+          type: 'search',
+          className: 'dsh-pl-search',
+          placeholder: textOf(t, 'list.marketSearch'),
+          value: marketQuery,
+          onChange: (event) => onMarketQuery(event.target.value),
+        })
+        if (query) {
+          const items = Array.isArray(searchResult) ? searchResult : []
+          return h('div', { className: 'dsh-pl-market' },
+            searchBox,
+            searchStatus === 'loading'
+              ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketSearching'))
+              : searchStatus === 'error'
+                ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.searchError'))
+                : items.length === 0
+                  ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketNoMatch'))
+                  : h('div', null,
+                    h('div', { className: 'dsh-pl-block-head' },
+                      h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(items.length)))),
+                    h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
+                      items.map((row, index) => h(PluginCard, {
+                        key: row.name || index,
+                        icon: null,
+                        title: row.name,
+                        subtitle: row.summary || row.category || '',
+                        className: 'is-market',
+                        onClick: () => setSelectedMarket(row),
+                        actions: [hotAction(row)],
+                      })))))
+        }
         return h('div', { className: 'dsh-pl-market' },
-          h('div', { className: 'dsh-pl-market-head' },
-            h('strong', null, textOf(t, 'list.marketTitle')),
-            h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.marketHint'))),
+          searchBox,
           trendStatus === 'loading'
             ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketLoading'))
             : trendStatus === 'error'
               ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketError'))
               : days.length
                 ? [
-                  h('div', { className: 'dsh-pl-market-stats' },
-                    stat(textOf(t, 'list.countNow'), last.count.toLocaleString()),
-                    stat(textOf(t, 'list.countFiltered'), (last.rejected || 0).toLocaleString()),
-                    stat(textOf(t, 'list.perDay'), `+${perDay.toLocaleString()}`),
-                    stat(textOf(t, 'list.spanDays'), String(days.length))),
-                  trendChart(days),
+                  h('section', { className: 'dsh-pl-block', key: 'trend' },
+                    h('div', { className: 'dsh-pl-block-head' },
+                      h('strong', null, textOf(t, 'list.chartTitle')),
+                      h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'chart' },
+                        chip('cumulative', textOf(t, 'list.chartCumulative'), chartMode, setChartMode),
+                        chip('daily', textOf(t, 'list.chartDaily'), chartMode, setChartMode))),
+                    h('div', { className: 'dsh-pl-market-stats' },
+                      stat(textOf(t, 'list.countNow'), last.count.toLocaleString()),
+                      stat(textOf(t, 'list.countFiltered'), (last.rejected || 0).toLocaleString()),
+                      stat(textOf(t, 'list.perDay'), `+${perDay.toLocaleString()}`),
+                      stat(textOf(t, 'list.spanDays'), String(days.length))),
+                    h('div', { className: 'dsh-pl-chart-wrap' },
+                      chartMode === 'daily'
+                        ? barChart(days, hoverIndex, setHoverIndex)
+                        : trendChart(days, hoverIndex, setHoverIndex, textOf(t, 'list.marketFirstNote'))),
+                    h('p', { className: 'dsh-pl-note' }, chartMode === 'daily' ? textOf(t, 'list.chartDailyHint') : textOf(t, 'list.marketHint'))),
+                  hotView(),
                 ]
                 : null)
       }
@@ -840,21 +1347,28 @@ window.__ModuleLoader__.load({
         h('header', { className: 'dsh-pl-bar' },
           h('div', { className: 'dsh-pl-tools' },
             h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'filter' },
-              chip('installed', textOf(t, 'list.installed'), filter, (id) => { setFilter(id); remember({ filter: id }) }),
-              chip('builtin', textOf(t, 'list.builtin'), filter, (id) => { setFilter(id); remember({ filter: id }) }),
-              chip('all', textOf(t, 'list.all'), filter, (id) => { setFilter(id); remember({ filter: id }) })),
-            h('button', { type: 'button', onClick: () => { void load() } }, textOf(t, 'list.refresh')),
+              chip('installed', textOf(t, 'list.installed'), surface === 'market' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market'))),
             h('button', {
               type: 'button',
-              className: `dsh-pl-market-btn${surface === 'market' ? ' is-on' : ''}`,
-              onClick: () => setSurface(surface === 'market' ? 'plugins' : 'market'),
-            }, surface === 'market' ? textOf(t, 'list.back') : textOf(t, 'list.market')),
+              className: 'dsh-pl-refresh',
+              onClick: () => {
+                if (surface === 'market') {
+                  try { window.localStorage.removeItem('dsh.plugin-list.market.v1') } catch { /* ignore */ }
+                  setTrendStatus('')
+                  setHotStatus('')
+                } else {
+                  void load()
+                }
+              },
+            }, textOf(t, 'list.refresh')),
             h('div', { className: 'dsh-pl-view', role: 'group', 'aria-label': 'view' },
               chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
               chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) })),
             h('span', { className: 'dsh-pl-version' }, VERSION))),
         surface === 'market'
-          ? marketView()
+          ? selectedMarket ? marketDetail(selectedMarket) : marketView()
           : status === 'loading' && plugins.length === 0
           ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.loading'))
           : status === 'unavailable'
@@ -871,66 +1385,80 @@ window.__ModuleLoader__.load({
                     ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.empty'))
                     : visible.map((plugin) => {
                       const title = pluginTitle(plugin, localeId)
-                      const icon = safeIcon(plugin.meta && plugin.meta.icon)
+                      const iconUrl = safeIcon(plugin.meta && plugin.meta.icon)
                       const kind = tabKindFor(plugin, guide, localeId)
                       const pinned = pins.includes(plugin.entryId)
-                      return h('div', {
+                      const places = placesFor(plugin, guide, seats, localeId)
+                        .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
+                        .join(' · ') || textOf(t, 'list.placeNone')
+                      const classes = [
+                        selectedId === plugin.entryId ? 'is-on' : '',
+                        pinned ? 'is-pinned' : '',
+                        plugin.fiberPhase === 'failed' ? 'is-failed' : '',
+                      ].filter(Boolean).join(' ')
+                      return h(PluginCard, {
                         key: plugin.entryId,
-                        className: `dsh-pl-item${selectedId === plugin.entryId ? ' is-on' : ''}${pinned ? ' is-pinned' : ''}${plugin.fiberPhase === 'failed' ? ' is-failed' : ''}`,
-                        role: 'button',
-                        tabIndex: 0,
+                        icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
+                        title,
+                        subtitle: places,
+                        className: classes,
                         onClick: () => setSelectedId(plugin.entryId),
-                        onKeyDown: (event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            setSelectedId(plugin.entryId)
-                          }
-                        },
-                      },
-                      icon
-                        ? h('img', { src: icon, alt: '', draggable: false })
-                        : h(DefaultPluginIcon),
-                      h('span', { className: 'dsh-pl-copy' },
-                        h('strong', null, title),
-                        h('span', { className: 'dsh-pl-where' },
-                          (placesFor(plugin, guide, seats, localeId).map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft')).join(' · ')
-                            || textOf(t, 'list.placeNone')))),
-                      h('div', { className: 'dsh-pl-acts' },
-                        h('button', {
-                          type: 'button',
-                          className: 'dsh-pl-pin',
-                          'aria-pressed': pinned,
-                          onClick: (event) => {
-                            event.stopPropagation()
-                            togglePin(plugin.entryId)
-                          },
-                        }, pinned ? textOf(t, 'list.unpin') : textOf(t, 'list.pin')),
-                        kind ? h('button', {
-                          type: 'button',
-                          className: 'dsh-pl-open',
-                          onClick: (event) => {
-                            event.stopPropagation()
-                            if (typeof openPanel === 'function') openPanel(kind)
-                          },
-                        }, textOf(t, 'list.open')) : null))
+                        actions: [
+                          h('button', {
+                            key: 'pin',
+                            type: 'button',
+                            className: 'dsh-pl-card-btn',
+                            'aria-pressed': pinned,
+                            onClick: (event) => {
+                              event.stopPropagation()
+                              togglePin(plugin.entryId)
+                            },
+                          }, pinned ? textOf(t, 'list.unpin') : textOf(t, 'list.pin')),
+                          kind ? h('button', {
+                            key: 'open',
+                            type: 'button',
+                            className: 'dsh-pl-card-btn',
+                            onClick: (event) => {
+                              event.stopPropagation()
+                              if (typeof openPanel === 'function') openPanel(kind)
+                            },
+                          }, textOf(t, 'list.open')) : null,
+                        ],
+                      })
                     }))))
     }
 
     const CSS = `
 .dsh-pl, .dsh-pl * { box-sizing: border-box; }
-.dsh-pl { display: flex; flex-direction: column; flex: 1 1 auto; height: 100%; min-height: 0; min-width: 0; padding-top: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font: 13px/1.4 inherit; }
+.dsh-pl {
+  --pl-fs-xs: 11px;
+  --pl-fs-sm: 12px;
+  --pl-fs-md: 13px;
+  --pl-fs-lg: 14px;
+  --pl-fs-title: 16px;
+  --pl-fs-num: 18px;
+  --pl-gap-1: 4px;
+  --pl-gap-2: 8px;
+  --pl-gap-3: 12px;
+  --pl-radius-card: 16px;
+  --pl-radius-inner: 12px;
+  --pl-radius-chip: 10px;
+  --pl-radius-pill: 7px;
+}
+.dsh-pl { display: flex; flex-direction: column; flex: 1 1 auto; height: 100%; min-height: 0; min-width: 0; padding-top: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font-family: inherit; font-size: var(--pl-fs-md); line-height: 1.4; }
 .dsh-pl-bar { display: flex; flex: none; flex-direction: column; gap: 8px; margin: 0; padding: 12px 12px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)); position: relative; z-index: 1; }
 .dsh-pl-top { display: flex; align-items: center; justify-content: space-between; }
-.dsh-pl-version, .dsh-pl-hint, .dsh-pl-item span { color: var(--dsw-alias-label-secondary); font-size: 11px; }
+.dsh-pl-version, .dsh-pl-hint, .dsh-pl-item span { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-hint { margin: 0; }
 .dsh-pl-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
-.dsh-pl-version { margin-left: 8px; }
-.dsh-pl-view { display: flex; gap: 2px; margin-left: auto; padding: 2px; border-radius: 8px; background: var(--dsw-alias-bg-layer-2); }
-.dsh-pl-view button { border: 0; border-radius: 6px; padding: 3px 8px; font-size: 11px; background: transparent; color: var(--dsw-alias-label-secondary); }
+.dsh-pl-refresh { margin-left: auto; }
+.dsh-pl-version { margin-left: 10px; }
+.dsh-pl-view { display: flex; gap: 2px; padding: 2px; border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-view button { border: 0; border-radius: var(--pl-radius-pill); padding: 3px 8px; font-size: var(--pl-fs-xs); background: transparent; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-view button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; }
-.dsh-pl-seg { display: flex; gap: 2px; padding: 3px; border: 0; border-radius: 10px; background: var(--dsw-alias-bg-layer-2); }
-.dsh-pl button { font: inherit; font-size: 12px; line-height: 1.2; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
-.dsh-pl-seg button { border: 0; border-radius: 7px; background: transparent; color: var(--dsw-alias-label-secondary); padding: 5px 12px; }
+.dsh-pl-seg { display: flex; gap: 2px; padding: 3px; border: 0; border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl button { font: inherit; font-size: var(--pl-fs-sm); line-height: 1.2; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); padding: 6px 12px; cursor: pointer; }
+.dsh-pl-seg button { border: 0; border-radius: var(--pl-radius-pill); background: transparent; color: var(--dsw-alias-label-secondary); padding: 5px 12px; }
 .dsh-pl-seg button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; box-shadow: none; }
 .dsh-pl-item.is-on { border-color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: inset 0 0 0 1px var(--dsw-alias-brand-primary); }
 .dsh-pl-body { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
@@ -942,54 +1470,67 @@ window.__ModuleLoader__.load({
 .dsh-pl-acts { display: flex; gap: 6px; align-items: center; margin-left: auto; flex: none; }
 .dsh-pl-item { position: relative; }
 .dsh-pl-grid.is-card .dsh-pl-acts { position: absolute; top: 8px; right: 8px; margin: 0; padding: 0; background: transparent; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
-.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-pin, .dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-open { padding: 4px 8px; font-size: 11px; border: 0; background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-card-btn { padding: 4px 8px; font-size: var(--pl-fs-xs); border: 0; background: var(--dsw-alias-bg-layer-2); }
 .dsh-pl-grid.is-card .dsh-pl-item:hover .dsh-pl-acts, .dsh-pl-grid.is-card .dsh-pl-item:focus-within .dsh-pl-acts { opacity: 1; pointer-events: auto; }
-.dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: 16px; background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
-.dsh-pl-open, .dsh-pl-pin { margin-left: 0; flex: none; position: static; }
+.dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
+.dsh-pl-card-btn { margin-left: 0; flex: none; position: static; }
 .dsh-pl-item.is-pinned { background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, var(--dsw-alias-bg-layer-1)); }
-.dsh-pl-item img, .dsh-pl-fallback { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; flex: none; }
+.dsh-pl-item img, .dsh-pl-fallback { width: 22px; height: 22px; border-radius: var(--pl-radius-pill); object-fit: cover; flex: none; }
 .dsh-pl-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
-.dsh-pl-copy strong { font-size: 14px; font-weight: 560; color: var(--dsw-alias-label-primary); white-space: normal; overflow-wrap: anywhere; }
-.dsh-pl-where { color: var(--dsw-alias-label-secondary); font-size: 11px; }
+.dsh-pl-copy strong { font-size: var(--pl-fs-lg); font-weight: 560; color: var(--dsw-alias-label-primary); white-space: normal; overflow-wrap: anywhere; }
+.dsh-pl-where { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
+.dsh-pl-item.is-market .dsh-pl-where { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dsh-pl-item.is-market .dsh-pl-copy strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dsh-pl-item.is-failed { border-color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-state { margin: 16px; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-detail { flex: 1 1 auto; width: auto; max-width: none; min-width: 0; min-height: 0; overflow: auto; background: var(--dsw-alias-bg-base); padding: 12px 16px 20px; }
 .dsh-pl-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.dsh-pl-detail-head strong { flex: 1 1 auto; min-width: 0; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+.dsh-pl-detail-head strong { flex: 1 1 auto; min-width: 0; font-size: var(--pl-fs-title); line-height: 1.35; overflow-wrap: anywhere; }
 .dsh-pl-detail-head button { flex: none; white-space: nowrap; align-self: flex-start; }
 .dsh-pl-detail-head img, .dsh-pl-detail-head .dsh-pl-fallback { width: 32px; height: 32px; }
 .dsh-pl-fact { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); column-gap: 12px; align-items: start; margin: 0 0 10px; }
-.dsh-pl-fact-label { color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.45; }
-.dsh-pl-fact-value { color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-.dsh-pl-detail h3 { margin: 14px 0 6px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
-.dsh-pl-detail p, .dsh-pl-doc { margin: 0 0 8px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-.dsh-pl-note { color: var(--dsw-alias-label-secondary); }
+.dsh-pl-fact-label { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-sm); line-height: 1.45; }
+.dsh-pl-fact-value { color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
+.dsh-pl-detail h3 { margin: 14px 0 6px; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-detail p, .dsh-pl-doc { margin: 0 0 8px; font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
+.dsh-pl-note { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-sm); line-height: 1.5; }
 .dsh-pl-doc-block { margin-top: 12px; }
-.dsh-pl-md h3, .dsh-pl-md-h { margin: 14px 0 6px; font-size: 14px; line-height: 1.4; font-weight: 650; color: var(--dsw-alias-label-primary); }
-.dsh-pl-md h4 { margin: 10px 0 4px; font-size: 13px; font-weight: 650; }
-.dsh-pl-md p, .dsh-pl-md li { margin: 0 0 8px; font-size: 13px; line-height: 1.55; }
+.dsh-pl-md h3, .dsh-pl-md-h { margin: 14px 0 6px; font-size: var(--pl-fs-lg); line-height: 1.4; font-weight: 650; color: var(--dsw-alias-label-primary); }
+.dsh-pl-md h4 { margin: 10px 0 4px; font-size: var(--pl-fs-md); font-weight: 650; }
+.dsh-pl-md p, .dsh-pl-md li { margin: 0 0 8px; font-size: var(--pl-fs-md); line-height: 1.55; }
 .dsh-pl-md ul { margin: 0 0 10px; padding-left: 18px; }
-.dsh-pl-md code { font-size: 12px; padding: 0 4px; border-radius: 4px; background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-md code { font-size: var(--pl-fs-sm); padding: 0 4px; border-radius: 4px; background: var(--dsw-alias-bg-layer-2); }
 .dsh-pl-md a { color: var(--dsw-alias-brand-primary); }
-.dsh-pl-table-wrap { margin: 8px 0 14px; overflow-x: auto; border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; }
-.dsh-pl-md table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dsh-pl-table-wrap { margin: 8px 0 14px; overflow-x: auto; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); }
+.dsh-pl-md table { width: 100%; border-collapse: collapse; font-size: var(--pl-fs-md); }
 .dsh-pl-md th, .dsh-pl-md td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .dsh-pl-md th { color: var(--dsw-alias-label-secondary); font-weight: 650; background: var(--dsw-alias-bg-layer-1); white-space: nowrap; }
 .dsh-pl-md td:first-child { white-space: nowrap; }
 .dsh-pl-md tr:last-child td { border-bottom: 0; }
-.dsh-pl-market-btn.is-on { background: var(--dsw-alias-bg-layer-2); }
-.dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px 18px 28px; }
-.dsh-pl-market-head strong { display: block; font-size: 15px; margin-bottom: 6px; }
-.dsh-pl-market-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 8px; }
-.dsh-pl-stat { display: flex; flex-direction: column; gap: 4px; min-width: 118px; padding: 10px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
-.dsh-pl-stat span { font-size: 11px; color: var(--dsw-alias-label-secondary); }
-.dsh-pl-stat strong { font-size: 20px; font-weight: 600; }
-.dsh-pl-chart { display: block; width: 100%; height: auto; margin-top: 12px; }
+.dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
+.dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
+.dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-stat strong { font-size: var(--pl-fs-num); font-weight: 600; line-height: 1.2; }
+.dsh-pl-chart-wrap { padding: 10px 12px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
+.dsh-pl-chart { display: block; width: 100%; height: auto; }
+.dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
+.dsh-pl-block-head span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-block { margin-bottom: 22px; }
+.dsh-pl-market .dsh-pl-note { margin: 10px 2px 0; }
+.dsh-pl-hot { margin-top: 4px; }
+.dsh-pl-search { width: 100%; margin: 2px 0 8px; padding: 8px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); }
+.dsh-pl-search::placeholder { color: var(--dsw-alias-label-secondary); }
+.dsh-pl-search:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }
+.dsh-pl-delta { flex: none; margin-left: auto; font-size: var(--pl-fs-sm); font-weight: 600; color: var(--dsw-alias-brand-primary); }
+.dsh-pl-busy { flex: none; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-hot-busy { flex: none; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
 `
 
     return {
-      name: 'dsh-plugins-ui',
+      name: 'dsh-plugin-panel',
       inject: ['slots', 'sidebarRightTabs', 'sidebarRight', 'layout', 'locale', 'remote', 'remote.pluginManager', 'remote.session', 'connection'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, COPY), 'plugin-list: dictionaries')
@@ -1002,6 +1543,10 @@ window.__ModuleLoader__.load({
         const rpcCall = ctx.connection.rpc.call.bind(ctx.connection.rpc)
         const loadFacts = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'facts', payload || {})
         const loadMarketTrend = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'trend', payload || {})
+        const loadMarketHot = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'hot', payload || {})
+        const searchCatalog = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'search', payload || {})
+        const installBundle = pluginManager.installBundle.bind(pluginManager)
+        const removeBundle = pluginManager.removeBundle.bind(pluginManager)
         const revealPackage = async (payload) => {
           const input = payload && typeof payload === 'object' ? payload : {}
           const dir = directoryFromSource(input.source)
@@ -1085,7 +1630,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, loadFacts, revealPackage, loadMarketTrend, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }

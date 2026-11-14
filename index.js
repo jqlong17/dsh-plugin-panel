@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectTrend } from './trend.js'
+import { collectHot, collectSearch, collectTrend } from './trend.js'
 
 const CHANNEL = '/dsh-plugins-ui-rpc'
 const MAX_SOURCE_BYTES = 1_200_000
@@ -65,6 +65,8 @@ function registerDetailRpc(ctx, services) {
         else if (method === 'facts') result = { ok: true, value: readFacts(record.payload) }
         else if (method === 'reveal') result = { ok: true, value: revealPackage(record.payload) }
         else if (method === 'trend') result = { ok: true, value: await readTrend() }
+        else if (method === 'hot') result = { ok: true, value: await readHot() }
+        else if (method === 'search') result = { ok: true, value: await readSearch(record.payload) }
         else throw new Error('Unknown detail method.')
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -154,8 +156,75 @@ function writeTrendCache(value) {
   }
 }
 
+const memo = new Map()
+
+/** Keep one in-process result briefly; the on-disk archive is the real cache. */
+async function withMemo(key, ttlMs, run) {
+  const hit = memo.get(key)
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value
+  const value = await run()
+  memo.set(key, { at: Date.now(), value })
+  return value
+}
+
 function readTrend() {
-  return collectTrend(readTrendCache, writeTrendCache)
+  return withMemo('trend', 5 * 60 * 1000, () => collectTrend(readTrendCache, writeTrendCache))
+}
+
+function hotCacheFile() {
+  const profile = process.env.DSH_PROFILE_DIR || path.join(process.env.HOME || '', '.dsh/profiles/desktop')
+  return path.join(profile, '.plugin-panel', 'hot.json')
+}
+
+function readHotCache() {
+  try {
+    return JSON.parse(readFileSync(hotCacheFile(), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function writeHotCache(value) {
+  try {
+    const file = hotCacheFile()
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, JSON.stringify(value))
+  } catch {
+    /* ranking still renders without a cache */
+  }
+}
+
+function readHot() {
+  return withMemo('hot', 5 * 60 * 1000, () => collectHot(readHotCache, writeHotCache, 7))
+}
+
+function searchCacheFile() {
+  const profile = process.env.DSH_PROFILE_DIR || path.join(process.env.HOME || '', '.dsh/profiles/desktop')
+  return path.join(profile, '.plugin-panel', 'search-index.json')
+}
+
+function readSearchCache() {
+  try {
+    return JSON.parse(readFileSync(searchCacheFile(), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function writeSearchCache(value) {
+  try {
+    const file = searchCacheFile()
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, JSON.stringify(value))
+  } catch {
+    /* search still works without the cache */
+  }
+}
+
+function readSearch(payload) {
+  const input = payload && typeof payload === 'object' ? payload : {}
+  const query = typeof input.query === 'string' ? input.query : ''
+  return collectSearch(readSearchCache, writeSearchCache, query, 100)
 }
 
 function readFacts(payload) {
