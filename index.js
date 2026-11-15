@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 import { spawn } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectHot, collectSearch, collectTrend } from './trend.js'
@@ -9,6 +9,7 @@ import { collectHot, collectSearch, collectTrend } from './trend.js'
 // 日志也要落在插件目录里。**必须定义在所有引用它们的常量之前**——
 // 之前把 MOBILE_LOG 写在 SELF_DIR 前面，const 的暂时性死区直接让整个插件加载失败
 // （表现为所有路由 404/405，2026-11-16 踩到）。
+const bundleRequire = createRequire(import.meta.url)
 const SELF_DIR = path.dirname(fileURLToPath(import.meta.url))
 const NODE_MODULES_DIR = path.resolve(SELF_DIR, '..')
 
@@ -108,11 +109,12 @@ header h1{margin:0;font-size:17px;font-weight:600}
 header .count{color:var(--fg2);font-size:13px}
 main{padding:8px 12px 24px}
 .item{background:var(--card);border-radius:12px;margin:8px 0;overflow:hidden}
-.item summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;min-height:44px}
+.item summary{list-style:none;cursor:pointer;padding:14px 16px 6px;display:flex;align-items:center;gap:10px;min-height:44px}
 .item summary::-webkit-details-marker{display:none}
 .item .name{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item .ver{color:var(--fg2);font-size:12px;font-variant-numeric:tabular-nums}
 .item[open] summary{border-bottom:.5px solid var(--line)}
+.inline{padding:0 16px 12px;color:var(--fg2);font-size:13px;line-height:1.45}
 .detail{padding:12px 16px 16px;color:var(--fg2);font-size:13px}
 .detail p{margin:0 0 8px}
 .detail a{color:var(--accent);text-decoration:none}
@@ -124,6 +126,95 @@ function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
+}
+
+/**
+ * 取一个插件的「简介」和「详情摘要」。
+ *
+ * 为什么不用 `bundle.rows[0].summary`：那是市场索引的数据，本地装的插件大多是空，
+ * 所以之前页面上一片「（这个插件没有写简介）」。
+ * package.json 的 description 覆盖 188/189，README 覆盖 185/189，直接用这两个最可靠。
+ */
+function firstParagraph(markdown) {
+  const out = []
+  for (const raw of String(markdown).split('\n')) {
+    const line = raw.trim()
+    if (line === '') { if (out.length > 0) break; else continue }
+    // 跳过标题、徽章、纯 HTML、代码围栏
+    if (/^#{1,6}\s/.test(line)) continue
+    if (line.startsWith('![') || line.startsWith('[![') || line.startsWith('<')) continue
+    if (line.startsWith('```')) continue
+    out.push(line)
+  }
+  return out.join(' ')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')   // 链接留文字
+    .replace(/[*_`>]/g, '')                    // 去掉行内标记
+    .trim()
+    .slice(0, 220)
+}
+
+/**
+ * 定位一个包的真实目录。
+ *
+ * **不能用 `path.join(NODE_MODULES_DIR, name)`**：profile 里的插件很多是指向源码目录的
+ * 符号链接（如 dsh-plugin-panel → ~/projects/dsh-plugins/dsh-plugin-canvas），
+ * 而 `import.meta.url` 会解析成真实路径，算出来的 NODE_MODULES_DIR 就成了源码目录的父级，
+ * 完全不是 DSH 的 node_modules（2026-11-16：48 个插件只有 16 个能读到简介）。
+ *
+ * 用 Node 的解析链最稳：`require.resolve` 会沿真实的 node_modules 找到每个包。
+ */
+function profileRoots() {
+  // 插件可能是「指向源码目录的符号链接」也可能是实体装进 profile，
+  // 而 import.meta.url 会解析成真实路径（源码目录），所以从它推不出 DSH 的 node_modules。
+  // 工作目录是 /、环境变量里也没有 profile 信息（2026-11-16 实测），只能扫。
+  const roots = [NODE_MODULES_DIR]
+  const profilesRoot = path.join(process.env.HOME ?? '', '.dsh', 'profiles')
+  try {
+    for (const entry of readdirSync(profilesRoot, { withFileTypes: true })) {
+      if (entry.isDirectory()) roots.push(path.join(profilesRoot, entry.name, 'node_modules'))
+    }
+  } catch { /* 没有 profiles 目录：只留源码目录那条 */ }
+  return roots
+}
+
+function resolvePackageDir(name) {
+  // ① Node 的解析链：覆盖「插件依赖里能找到的包」
+  try {
+    return path.dirname(bundleRequire.resolve(`${name}/package.json`))
+  } catch { /* 被 exports 挡住 */ }
+  try {
+    let dir = path.dirname(bundleRequire.resolve(name))
+    for (let i = 0; i < 6; i += 1) {
+      if (existsSync(path.join(dir, 'package.json'))) return dir
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  } catch { /* 解析不了 */ }
+
+  // ② 逐个候选根找：覆盖「源码目录」与「各个 profile 的 node_modules」
+  for (const root of profileRoots()) {
+    const dir = path.join(root, name)
+    if (existsSync(path.join(dir, 'package.json'))) return dir
+  }
+  return null
+}
+
+function readBundleTexts(name) {
+  let description = ''
+  const dir = resolvePackageDir(name)
+  if (dir === null) return { description, detail: '' }
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8'))
+    if (typeof pkg.description === 'string') description = pkg.description.trim()
+  } catch { /* 坏包：留空 */ }
+  let detail = ''
+  try {
+    detail = firstParagraph(readFileSync(path.join(dir, 'README.md'), 'utf8'))
+  } catch { /* 没有 README：留空 */ }
+  // 两者内容重复时只留一份，避免列表里出现两行一样的字
+  if (detail && description && detail.startsWith(description)) detail = detail.slice(description.length).trim()
+  return { description, detail }
 }
 
 async function collectBundles(pluginManager) {
@@ -190,18 +281,21 @@ function readMobileManifests() {
 
 function renderMobilePage(bundles) {
   const rows = bundles.map((bundle) => {
-    const name = escapeHtml(bundle.name)
+    const moduleName = String(bundle.name ?? '')
+    const name = escapeHtml(moduleName)
     const version = escapeHtml(bundle.version ?? '')
-    const summary = escapeHtml(bundle.rows?.[0]?.summary ?? '')
+    const { description, detail } = readBundleTexts(moduleName)
     const repo = typeof bundle.repo === 'string' ? bundle.repo : ''
-    const removable = bundle.removable === false ? '' : ''
+    // 列表行直接带一句话简介，不用展开就能看出这个插件是干什么的
+    const inline = description ? `<span class="desc">${escapeHtml(description)}</span>` : ''
     return `<details class="item">`
       + `<summary><span class="name">${name}</span>`
       + `<span class="ver">${version}</span></summary>`
+      + (inline ? `<div class="inline">${inline}</div>` : '')
       + `<div class="detail">`
-      + (summary ? `<p>${summary}</p>` : '<p>（这个插件没有写简介）</p>')
+      + (detail ? `<p>${escapeHtml(detail)}</p>` : '')
+      + (!detail && !description ? '<p>这个插件没有写简介也没有 README。</p>' : '')
       + (repo ? `<a href="${escapeHtml(repo)}" target="_blank" rel="noreferrer">打开仓库</a>` : '')
-      + removable
       + `</div></details>`
   }).join('\n')
 
