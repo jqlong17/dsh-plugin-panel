@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.9'
+    const VERSION = 'v0.1.10'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -20,6 +20,20 @@ window.__ModuleLoader__.load({
         'list.market': '市场趋势',
         'list.featured': '精选推荐',
         'list.design': '设计规范',
+        'list.about': '关于',
+        'list.aboutWhat': '这个插件做什么',
+        'list.aboutWhatBody1': '「插件管理」是 DeepSeek Harness 的右侧栏插件管理器。它列出所有已安装的插件，并标出每个插件从哪里进——右侧栏、设置页、左侧菜单，或者根本没有界面。常用的可以置顶，点一下就跳过去。',
+        'list.aboutWhatBody2': '它还带一个插件市场：目录增长趋势、最近 7 天增长最快榜、支持中文的全库搜索，看到顺眼的点一下就装。另外每个插件卡片上有元信息体检，缺什么、会怎样、怎么补都写在报告里，一键复制就能交给 AI 去改。',
+        'list.aboutFacts': '基本信息',
+        'list.aboutPackage': '包名',
+        'list.aboutVersion': '版本',
+        'list.aboutLicense': '许可',
+        'list.aboutRepo': '仓库',
+        'list.aboutData': '数据位置',
+        'list.aboutShare': '分享给别人',
+        'list.aboutShareHint': '把下面这段整段复制，发给任意一个能操作电脑的 AI，它就能自己把插件装上。',
+        'list.aboutCopy': '复制这段话',
+        'list.aboutCopied': '安装说明已复制，粘给任意 AI 即可让它帮你装',
         'list.designTitle': '插件设计规范',
         'list.designHint': '按场景选一段复制，粘给任意 AI 即可。所有 token 名都对照 DSH 实际样式表核对过。',
         'list.designCopy': '复制规范',
@@ -144,6 +158,20 @@ window.__ModuleLoader__.load({
         'list.market': 'Market trends',
         'list.featured': 'Featured',
         'list.design': 'Design spec',
+        'list.about': 'About',
+        'list.aboutWhat': 'What this plugin does',
+        'list.aboutWhatBody1': 'Plugin manager for the DeepSeek Harness right sidebar. It lists every installed plugin and shows where each one lives — right sidebar, settings, left menu, or no UI at all. Pin the ones you use and jump straight to them.',
+        'list.aboutWhatBody2': 'It also carries a plugin market: catalog growth trends, a 7-day growth ranking, whole-catalog search that understands Chinese, and one-click install. Each card shows a metadata health check that says what is missing, what it breaks, and how to fix it — copy the report and hand it to an AI.',
+        'list.aboutFacts': 'Basics',
+        'list.aboutPackage': 'Package',
+        'list.aboutVersion': 'Version',
+        'list.aboutLicense': 'License',
+        'list.aboutRepo': 'Repository',
+        'list.aboutData': 'Data',
+        'list.aboutShare': 'Share it',
+        'list.aboutShareHint': 'Copy the whole block below and hand it to any computer-operating AI; it can install the plugin by itself.',
+        'list.aboutCopy': 'Copy this',
+        'list.aboutCopied': 'Install instructions copied — paste them into any agent',
         'list.designTitle': 'Plugin design spec',
         'list.designHint': 'Copy the section that matches your situation and hand it to any AI. Token names are verified against the real DSH stylesheet.',
         'list.designCopy': 'Copy spec',
@@ -1954,6 +1982,76 @@ window.__ModuleLoader__.load({
         searchTimer.current = setTimeout(() => runMarketSearch(value, searchSort), 300)
       }
 
+      /** 「关于」页：这个插件是什么、基本事实、怎么分享给别人。 */
+      function aboutView() {
+        const profileDir = '~/.dsh/profiles/<profile>/.plugin-panel'
+        const facts = [
+          [textOf(t, 'list.aboutPackage'), 'dsh-plugin-panel'],
+          [textOf(t, 'list.aboutVersion'), VERSION],
+          [textOf(t, 'list.aboutLicense'), 'MIT'],
+          [textOf(t, 'list.aboutRepo'), 'github.com/jqlong17/dsh-plugin-panel'],
+          [textOf(t, 'list.aboutData'), profileDir],
+        ]
+        return h('div', { className: 'dsh-pl-market' },
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutWhat')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody1')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody2'))),
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutFacts')),
+            h('div', { className: 'dsh-pl-about-facts' },
+              facts.map(([label, value]) => h('div', { className: 'dsh-pl-about-fact', key: label },
+                h('span', { className: 'dsh-pl-about-label' }, label),
+                h('span', { className: 'dsh-pl-about-value' }, value))))),
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutShare')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutShareHint')),
+            h('pre', { className: 'dsh-pl-about-pre' }, shareText()),
+            h('button', {
+              type: 'button',
+              className: 'dsh-pl-about-copy',
+              onClick: () => { void copyShare() },
+            }, copiedKey === 'about' ? textOf(t, 'list.copied') : textOf(t, 'list.aboutCopy'))))
+      }
+
+      function shareText() {
+        return [
+          `请帮我在 DeepSeek Harness 上安装插件 dsh-plugin-panel（中文名「插件管理」，版本 ${VERSION}）。`,
+          '',
+          '它是右侧栏的插件管理器：列出已安装插件并标出入口，带插件市场（增长趋势、7 天增长榜、中文搜索、一键装卸），以及每个插件的元信息体检。',
+          '',
+          '请按顺序做，每步做完告诉我结果：',
+          '',
+          '1. 确认当前 DSH 的 profile 名称（一般看 ~/.dsh/profiles/ 下哪个是你在用的）。',
+          '2. 安装：dsh plugin --profile <你的 profile> add dsh-plugin-panel',
+          '   如果 npm 上取不到这个包，说明还没发布，请直接告诉我，别自己改写依赖或去装同名的其它包。',
+          '3. 装完提醒我重启 DeepSeek Harness，然后打开右侧栏确认「插件管理」出现。',
+        ].join('\n')
+      }
+
+      async function copyShare() {
+        const text = shareText()
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text)
+          } else {
+            const area = document.createElement('textarea')
+            area.value = text
+            area.style.position = 'fixed'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            document.execCommand('copy')
+            document.body.removeChild(area)
+          }
+          setCopiedKey('about')
+          showToast(textOf(t, 'list.aboutCopied'))
+          setTimeout(() => setCopiedKey(''), 2200)
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
+      }
+
       function designView() {
         const section = SPEC_SECTIONS.find((s) => s.id === specTab) || SPEC_SECTIONS[0]
         return h('div', { className: 'dsh-pl-market' },
@@ -2115,11 +2213,12 @@ window.__ModuleLoader__.load({
         h('header', { className: 'dsh-pl-bar' },
           h('div', { className: 'dsh-pl-tools' },
             h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'filter' },
-              chip('installed', textOf(t, 'list.installed'), surface === 'market' || surface === 'featured' || surface === 'design' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
-              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' || surface === 'featured' || surface === 'design' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('installed', textOf(t, 'list.installed'), surface === 'market' || surface === 'featured' || surface === 'design' || surface === 'about' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' || surface === 'featured' || surface === 'design' || surface === 'about' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
               chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market')),
               chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => setSurface('featured')),
-              chip('design', textOf(t, 'list.design'), surface === 'design' ? 'design' : '', () => setSurface('design'))),
+              chip('design', textOf(t, 'list.design'), surface === 'design' ? 'design' : '', () => setSurface('design')),
+              chip('about', textOf(t, 'list.about'), surface === 'about' ? 'about' : '', () => setSurface('about'))),
             h('button', {
               type: 'button',
               className: 'dsh-pl-refresh',
@@ -2141,7 +2240,9 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dsh-pl-toast-dot' }),
           h('span', null, toast)) : null,
         listNote ? h('p', { className: 'dsh-pl-note dsh-pl-list-note' }, listNote) : null,
-        surface === 'design'
+        surface === 'about'
+          ? aboutView()
+          : surface === 'design'
           ? designView()
           : surface === 'featured'
           ? featuredView()
@@ -2332,6 +2433,17 @@ window.__ModuleLoader__.load({
 .dsh-pl-spec-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .dsh-pl-spec-bar .dsh-pl-seg { flex: 1 1 auto; min-width: 0; }
 .dsh-pl-spec-bar .dsh-pl-copy-spec { margin-left: auto; }
+.dsh-pl-about { padding: 16px 18px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
+.dsh-pl-about-h { margin: 0 0 10px; font-size: var(--pl-fs-lg); font-weight: 600; color: var(--dsw-alias-label-primary); }
+.dsh-pl-about-p { margin: 0 0 8px; font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
+.dsh-pl-about-p:last-of-type { margin-bottom: 0; }
+.dsh-pl-about-facts { display: flex; flex-direction: column; gap: 8px; }
+.dsh-pl-about-fact { display: flex; gap: 12px; align-items: baseline; }
+.dsh-pl-about-label { flex: none; width: 72px; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-about-value { min-width: 0; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-primary); word-break: break-all; }
+.dsh-pl-about-pre { margin: 10px 0 12px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--pl-fs-xs); line-height: 1.7; color: var(--dsw-alias-label-secondary); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; }
+.dsh-pl-about-copy { margin-left: auto; display: block; padding: 5px 12px; border: 0; border-radius: var(--pl-radius-chip); background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-on-color); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
+.dsh-pl-about-copy:hover { opacity: 0.9; }
 .dsh-pl-spec { padding: 14px 16px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-spec-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .dsh-pl-spec-hint { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
