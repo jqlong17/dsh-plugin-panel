@@ -305,15 +305,21 @@ function renderMobilePage(bundles, token) {
     const { description, detail } = readBundleTexts(moduleName)
     const repo = typeof bundle.repo === 'string' ? bundle.repo : ''
     const inline = description ? `<span class="desc">${escapeHtml(description)}</span>` : ''
-    return `<details class="item">`
-      + `<summary><span class="name">${name}</span>`
-      + `<span class="ver">${version}</span></summary>`
-      + (inline ? `<div class="inline">${inline}</div>` : '')
-      + `<div class="detail">`
-      + (detail ? `<p>${escapeHtml(detail)}</p>` : '')
-      + (!detail && !description ? '<p>这个插件没有写简介也没有 README。</p>' : '')
-      + (repo ? `<a href="${escapeHtml(repo)}" target="_blank" rel="noreferrer">打开仓库</a>` : '')
-      + `</div></details>`
+    // item 模板也在文件里：改列表结构不用重启
+    const itemTemplate = readIfExists(
+      path.join(SELF_DIR, 'mobile', 'item.html'),
+      '<details class="item"><summary><div class="head"><span class="name">{{NAME}}</span>'
+        + '<span class="ver">{{VERSION}}</span></div>{{INLINE}}</summary>{{DETAIL}}</details>',
+    )
+    return itemTemplate
+      .replaceAll('{{NAME}}', name)
+      .replaceAll('{{VERSION}}', version)
+      .replaceAll('{{INLINE}}', inline ? `<div class="inline">${inline}</div>` : '')
+      .replaceAll('{{DETAIL}}', `<div class="detail">`
+        + (detail ? `<p>${escapeHtml(detail)}</p>` : '')
+        + (!detail && !description ? '<p>这个插件没有写简介也没有 README。</p>' : '')
+        + (repo ? `<a href="${escapeHtml(repo)}" target="_blank" rel="noreferrer">打开仓库</a>` : '')
+        + `</div>`)
   }).join('\n')
 
   const template = readIfExists(
