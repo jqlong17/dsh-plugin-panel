@@ -63,33 +63,27 @@ npm install dsh-plugin-panel
 
 ## 发布
 
-用脚本，一条命令走完 bump → 自检 → 推送 → 发布 → 更新市场索引 → 验证：
+用通用的发布脚本（在 `dsh插件开发经验/scripts/` 下，所有插件共用）：
 
 ```bash
-scripts/release.sh patch     # 0.1.11 → 0.1.12
-scripts/release.sh minor     # 0.1.11 → 0.2.0
-scripts/release.sh 0.2.3     # 指定版本
+../dsh插件开发经验/scripts/release-plugin.sh . patch      # 0.1.11 → 0.1.12
+../dsh插件开发经验/scripts/release-plugin.sh . minor
+../dsh插件开发经验/scripts/release-plugin.sh . 0.2.3
 ```
 
-只确认版本和提交内容、不真正发布：
+它会自动识别：版本与包名读 `package.json`；有 `build` 脚本就构建；在 git 仓库里就提交推送；目录里有 `index.json` 且登记了本包就更新市场索引。
+
+不想真发布时：
 
 ```bash
-scripts/release.sh patch --dry-run
+../dsh插件开发经验/scripts/release-plugin.sh . patch --check     # 只检查，不改文件
+../dsh插件开发经验/scripts/release-plugin.sh . patch --dry-run   # 提交但不发布
 ```
 
-**凭证**：npm token 存在 macOS 钥匙串（服务名 `npm-dsh-plugin-panel`），脚本读出来临时写 `.npmrc`，结束自动删除，明文不落盘。
-
-换机器时需要存一次：
+**凭证**在 macOS 钥匙串（服务名 `npm-token`），脚本读出后临时写 `.npmrc`、结束即删，明文不落盘。换机器时存一次：
 
 ```bash
-security add-generic-password -a "$USER" -s npm-dsh-plugin-panel -w 'npm_你的token' -U
-```
-
-手动发布（不走脚本）：
-
-```bash
-npm pack      # 产出 <name>-<version>.tgz
-npm publish   # 需要对应 npm 权限
+security add-generic-password -a "$USER" -s npm-token -w 'npm_你的token' -U
 ```
 
 ## 边界
