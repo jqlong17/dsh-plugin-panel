@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.6'
+    const VERSION = 'v0.1.7'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -79,6 +79,11 @@ window.__ModuleLoader__.load({
         'list.loading': '正在读取插件…',
         'list.empty': '没有匹配的插件。',
         'list.error': '读不到插件列表。',
+        'list.copiedHint': '体检结果已复制，粘贴到左侧对话框或任意 AI 智能体即可按建议修正',
+        'list.copyFailed': '复制失败',
+        'list.healthFailed': '体检调用失败',
+        'list.healthEmpty': '体检没有返回结果',
+        'list.healthPending': '体检中',
         'list.remove': '卸载',
         'list.confirmRemove': '确认卸载',
         'list.removeCancelled': '卸载已取消',
@@ -193,6 +198,11 @@ window.__ModuleLoader__.load({
         'list.loading': 'Reading plugins…',
         'list.empty': 'No plugins match.',
         'list.error': 'Could not read the plugin list.',
+        'list.copiedHint': 'Health report copied — paste it into the chat or any agent to fix it',
+        'list.copyFailed': 'Copy failed',
+        'list.healthFailed': 'Health check failed',
+        'list.healthEmpty': 'Health check returned nothing',
+        'list.healthPending': 'Checking',
         'list.remove': 'Remove',
         'list.confirmRemove': 'Confirm',
         'list.removeCancelled': 'Remove cancelled',
@@ -635,7 +645,13 @@ window.__ModuleLoader__.load({
         if (!entry || !entry.kind) return false
         if (names.has(entry.id) || names.has(entry.providerId) || names.has(entry.kind)) return true
         const label = typeof entry.title === 'function' ? entry.title() : entry.title
-        return Boolean(label && title && label === title)
+        if (!label || !title) return false
+        // Tabs registered through sidebarRightTabs carry no owning-plugin id, so the
+        // label is the only link. Compare loosely: a localized label is usually a
+        // prefix of the inventory title, which often appends the package name.
+        const a = String(label).trim()
+        const b = String(title).trim()
+        return a === b || b.includes(a) || a.includes(b)
       })
       return hit ? hit.kind : ''
     }
@@ -705,6 +721,68 @@ window.__ModuleLoader__.load({
         rel: 'noreferrer noopener',
         onClick: (event) => event.stopPropagation(),
       }, text.replace(/^git\+/, ''))
+    }
+
+    /** 把一份体检结果写成可直接交给 AI 的 Markdown。 */
+    function diagnosisReport(plugin, title, diagnosis) {
+      const items = (diagnosis && Array.isArray(diagnosis.items)) ? diagnosis.items : []
+      const bad = items.filter((i) => i.level === 'bad')
+      const warn = items.filter((i) => i.level === 'warn')
+      const level = diagnosis && diagnosis.level ? diagnosis.level : 'unknown'
+      const verdict = level === 'bad' ? `需要修复（${bad.length} 项问题${warn.length ? `、${warn.length} 项建议` : ''}）`
+        : level === 'warn' ? `可用，有 ${warn.length} 项建议`
+          : level === 'ok' ? '健康' : '无法判断'
+      const lines = [
+        `# 插件体检：${title}`,
+        '',
+        `- 包名：${(plugin && plugin.moduleName) || ''}`,
+        `- 目录：${(diagnosis && diagnosis.root) || ''}`,
+        `- 健康度：${verdict}`,
+        '',
+      ]
+      if (bad.length) {
+        lines.push('## 需要修复', '')
+        bad.forEach((item, index) => {
+          lines.push(`${index + 1}. **${item.label}** — ${item.message}`)
+          if (item.fix) lines.push(`   - 修法：${item.fix}`)
+        })
+        lines.push('')
+      }
+      if (warn.length) {
+        lines.push('## 建议改进', '')
+        warn.forEach((item, index) => {
+          lines.push(`${index + 1}. **${item.label}** — ${item.message}`)
+          if (item.fix) lines.push(`   - 修法：${item.fix}`)
+        })
+        lines.push('')
+      }
+      const ok = items.filter((i) => i.level === 'ok')
+      if (ok.length) {
+        lines.push('## 已通过', '')
+        ok.forEach((item) => lines.push(`- ${item.label}：${item.message}`))
+        lines.push('')
+      }
+      lines.push('---', '以上为自动体检结果，请按「修法」逐项修改，改完重新构建并重启 DeepSeek Harness。')
+      return lines.join('\n')
+    }
+
+    /** 健康度标签：绿=健康，黄=有建议，红=需修复。 */
+    function healthChip(title, diagnosis, copied, onCopy) {
+      const level = diagnosis && diagnosis.level
+      if (!level || level === 'unknown') return null
+      const items = (diagnosis.items || [])
+      const bad = items.filter((i) => i.level === 'bad').length
+      const warn = items.filter((i) => i.level === 'warn').length
+      const text = level === 'bad' ? `健康度差 ${bad}` : level === 'warn' ? `建议 ${warn}` : '健康'
+      return h('button', {
+        type: 'button',
+        className: `dsh-pl-health is-${level}${copied ? ' is-copied' : ''}`,
+        title: level === 'ok' ? '元信息完整' : '点击复制体检结果，可直接发给 AI 修正',
+        onClick: (event) => {
+          event.stopPropagation()
+          onCopy()
+        },
+      }, copied ? '已复制' : text)
     }
 
     function compactNumber(value) {
@@ -836,6 +914,8 @@ window.__ModuleLoader__.load({
       const [failedKey, setFailedKey] = React.useState('')
       const [removeConfirm, setRemoveConfirm] = React.useState('')
       const [listNote, setListNote] = React.useState('')
+      const [diagnoses, setDiagnoses] = React.useState({})
+      const [copiedKey, setCopiedKey] = React.useState('')
       const [selectedMarket, setSelectedMarket] = React.useState(null)
       const [chartMode, setChartMode] = React.useState('cumulative')
       const [hotQuery, setHotQuery] = React.useState('')
@@ -880,11 +960,34 @@ window.__ModuleLoader__.load({
               setBundles(Array.isArray(bundleResult) ? bundleResult : [])
             } catch { /* package facts stay empty; the list itself still renders */ }
           }
-          } catch (failure) {
+          if (typeof props.diagnosePlugins === 'function') {
+            try {
+              // 只体检用户安装的插件：系统内置（@deepseek-ai/*）与 cordis 内建行是随发行版
+              // 一起发的，本身不会缺元信息，纳入只会制造噪音、拖慢体检。
+              const targets = list.filter((item) => originOf(item) === 'installed')
+              const report = await props.diagnosePlugins({
+                plugins: targets.map((item) => ({ entryId: item.entryId, moduleName: item.moduleName, source: item.source || '' })),
+              })
+              const value = report && report.ok === true ? report.value : report
+              if (report && report.ok === false) {
+                setListNote(`${textOf(t, 'list.healthFailed')}：${(report.error && (report.error.message || report.error.code)) || 'unknown'}`)
+                setDiagnoses({})
+              } else if (value && typeof value === 'object' && Object.keys(value).length) {
+                setDiagnoses(value)
+                setListNote('')
+              } else {
+                setListNote(textOf(t, 'list.healthEmpty'))
+                setDiagnoses({})
+              }
+            } catch (failure) {
+              setListNote(`${textOf(t, 'list.healthFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+            }
+          }
+        } catch (failure) {
           setError(failure instanceof Error ? failure.message : textOf(t, 'list.error'))
           setStatus((current) => (current === 'ready' ? 'ready' : 'error'))
         }
-      }, [listPlugins, listBundles, t])
+      }, [listPlugins, listBundles, props.diagnosePlugins, t])
 
       React.useEffect(() => { void load() }, [load])
       React.useEffect(() => {
@@ -1122,8 +1225,8 @@ window.__ModuleLoader__.load({
           { label: textOf(t, 'list.module'), value: shortModule(plugin.moduleName) },
           { label: textOf(t, 'list.entry'), value: plugin.entryId },
           { label: textOf(t, 'list.status'), value: textOf(t, phaseKey(plugin)) },
-          { label: textOf(t, 'list.package'), value: (selectedBundle && selectedBundle.name) || (manifest && manifest.name) || shortModule(plugin.moduleName) },
-          { label: textOf(t, 'list.version'), value: (selectedBundle && selectedBundle.version) || (manifest && manifest.version) },
+          { label: textOf(t, 'list.package'), value: (manifest && manifest.name) || (selectedBundle && selectedBundle.name) || shortModule(plugin.moduleName) },
+          { label: textOf(t, 'list.version'), value: (manifest && manifest.version) || (selectedBundle && selectedBundle.version) },
           { label: textOf(t, 'list.place'), value: place },
           { label: textOf(t, 'list.source'), value: source },
           { label: textOf(t, 'list.flags'), value: flags },
@@ -1211,6 +1314,29 @@ window.__ModuleLoader__.load({
           const moduleName = String(plugin.moduleName || '')
           return moduleName === target || plugin.patchId === target || plugin.entryId === `include:${target}`
         })
+      }
+
+      async function copyDiagnosis(plugin, title, diagnosis) {
+        const text = diagnosisReport(plugin, title, diagnosis)
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text)
+          } else {
+            const area = document.createElement('textarea')
+            area.value = text
+            area.style.position = 'fixed'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            document.execCommand('copy')
+            document.body.removeChild(area)
+          }
+          setCopiedKey(plugin.entryId)
+          setListNote(textOf(t, 'list.copiedHint'))
+          setTimeout(() => setCopiedKey(''), 2200)
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
       }
 
       async function removePlugin(plugin, bundle) {
@@ -1581,6 +1707,9 @@ window.__ModuleLoader__.load({
                         className: classes,
                         onClick: () => setSelectedId(plugin.entryId),
                         actions: [
+                          healthChip(title, diagnoses[plugin.entryId], copiedKey === plugin.entryId, () => {
+                            void copyDiagnosis(plugin, title, diagnoses[plugin.entryId])
+                          }),
                           (() => {
                             const bundle = matchBundle(plugin, bundles)
                             if (!bundle || !bundle.removable) return null
@@ -1666,7 +1795,12 @@ window.__ModuleLoader__.load({
 .dsh-pl-grid.is-card .dsh-pl-item:hover .dsh-pl-acts, .dsh-pl-grid.is-card .dsh-pl-item:focus-within .dsh-pl-acts { opacity: 1; pointer-events: auto; }
 .dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
 .dsh-pl-card-btn { margin-left: 0; flex: none; position: static; }
-.dsh-pl-card-btn.is-danger { color: var(--dsw-alias-state-danger-label); }
+.dsh-pl-health { flex: none; margin-left: 0; padding: 4px 9px; border: 0; border-radius: var(--pl-radius-chip); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; white-space: nowrap; }
+.dsh-pl-health.is-ok { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); cursor: default; }
+.dsh-pl-health.is-warn { background: color-mix(in srgb, var(--dsw-alias-state-warn-label) 14%, transparent); color: var(--dsw-alias-state-warn-label); }
+.dsh-pl-health.is-bad { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent); color: var(--dsw-alias-state-error-primary); }
+.dsh-pl-health.is-copied { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-card-btn.is-danger { color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-list-note { margin: 0 12px 8px; }
 .dsh-pl-item.is-pinned { background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, var(--dsw-alias-bg-layer-1)); }
 .dsh-pl-item img, .dsh-pl-fallback { width: 22px; height: 22px; border-radius: var(--pl-radius-pill); object-fit: cover; flex: none; }
@@ -1749,6 +1883,7 @@ window.__ModuleLoader__.load({
         const loadMarketTrend = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'trend', payload || {})
         const loadMarketHot = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'hot', payload || {})
         const searchCatalog = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'search', payload || {})
+        const diagnosePlugins = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'diagnose', payload || {})
         const installBundle = pluginManager.installBundle.bind(pluginManager)
         const removeBundle = pluginManager.removeBundle.bind(pluginManager)
         const revealPackage = async (payload) => {
@@ -1834,7 +1969,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }
