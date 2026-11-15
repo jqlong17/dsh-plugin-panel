@@ -61,6 +61,37 @@ npm install dsh-plugin-panel
 
 优先读插件自己声明的 `meta.detail`，没有就读它的 `README.md`。两样都没有，才会显示「没有说明文档」。
 
+## 发布
+
+用脚本，一条命令走完 bump → 自检 → 推送 → 发布 → 更新市场索引 → 验证：
+
+```bash
+scripts/release.sh patch     # 0.1.11 → 0.1.12
+scripts/release.sh minor     # 0.1.11 → 0.2.0
+scripts/release.sh 0.2.3     # 指定版本
+```
+
+只确认版本和提交内容、不真正发布：
+
+```bash
+scripts/release.sh patch --dry-run
+```
+
+**凭证**：npm token 存在 macOS 钥匙串（服务名 `npm-dsh-plugin-panel`），脚本读出来临时写 `.npmrc`，结束自动删除，明文不落盘。
+
+换机器时需要存一次：
+
+```bash
+security add-generic-password -a "$USER" -s npm-dsh-plugin-panel -w 'npm_你的token' -U
+```
+
+手动发布（不走脚本）：
+
+```bash
+npm pack      # 产出 <name>-<version>.tgz
+npm publish   # 需要对应 npm 权限
+```
+
 ## 边界
 
 - 只读扫描本机 profile 里的插件，不修改任何插件代码。
