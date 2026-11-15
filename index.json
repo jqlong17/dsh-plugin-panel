@@ -60,16 +60,26 @@
         "zh": "DSH Pocket iOS"
       },
       "description": {
-        "en": "Adds a native \"Phone access (iOS)\" settings page: App Store QR, fixed Tailscale address/QR, and local access-password management. Pairs with the DSH Pocket iOS app on the phone.",
-        "zh": "在 DSH 设置页新增原生「手机访问（iOS）」：App Store 下载二维码、Tailscale 固定地址/二维码、本机访问密码管理，配合手机上的 DSH Pocket iOS 客户端。"
+        "en": "Adds a native \"Phone access (iOS)\" settings page with four switchable connection methods: LAN, Cloudflare (zero install on the phone), Tailscale (fixed address), and EasyTier (self-hosted mesh via SOCKS5). Scan a QR to sign in — no password needed, and rebuilds no longer require re-scanning.",
+        "zh": "在 DSH 设置页新增原生「手机访问（iOS）」：局域网 / Cloudflare / Tailscale / EasyTier 四种连接方式可随时切换。扫码即连、无需密码；重新安装后也不用重新扫码。Cloudflare 与局域网手机端零安装。"
       },
       "icon": "https://raw.githubusercontent.com/jqlong17/dsh-plugins-ui/main/dsh-pocket-ios-icon.png",
       "author": "jqlong17",
-      "homepage": "https://github.com/jqlong17/dsh-pocket-ios",
+      "homepage": "https://my.feishu.cn/docx/XyhpdKD2Uo5y1ZxXFbscTpizntc",
       "versions": [
         {
           "version": "0.2.5",
           "publishTimestamp": 1794615509,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        },
+        {
+          "version": "0.5.0",
+          "publishTimestamp": 1794703236,
           "source": {
             "type": "npm"
           },
