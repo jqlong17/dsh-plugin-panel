@@ -110,12 +110,20 @@ window.__ModuleLoader__.load({
         'list.loading': '正在读取插件…',
         'list.empty': '没有匹配的插件。',
         'list.error': '读不到插件列表。',
+        'list.copied': '已复制',
         'list.copiedHint': '体检结果已复制，粘贴到左侧对话框或任意 AI 智能体即可按建议修正',
         'list.copyFailed': '复制失败',
         'list.healthFailed': '体检调用失败',
         'list.healthEmpty': '体检没有返回结果',
         'list.healthPending': '体检中',
         'list.remove': '卸载',
+        'list.updateTo': '更新到',
+        'list.updating': '更新中…',
+        'list.updateDone': '{name} 已更新到 {v}，重启 DSH 后生效',
+        'list.updateFailed': '更新失败',
+        'list.updateUnavailable': '这个 DSH 版本不支持在面板里更新，请用 dsh plugin 命令升级',
+        'list.updateRejected': '{v} 没有被接受，可能它不兼容当前 DSH，或者不是插件包',
+        'list.suggest': '建议',
         'list.confirmRemove': '确认卸载',
         'list.removeCancelled': '卸载已取消',
         'list.retry': '重试',
@@ -258,12 +266,20 @@ window.__ModuleLoader__.load({
         'list.loading': 'Reading plugins…',
         'list.empty': 'No plugins match.',
         'list.error': 'Could not read the plugin list.',
+        'list.copied': 'Copied',
         'list.copiedHint': 'Health report copied — paste it into the chat or any agent to fix it',
         'list.copyFailed': 'Copy failed',
         'list.healthFailed': 'Health check failed',
         'list.healthEmpty': 'Health check returned nothing',
         'list.healthPending': 'Checking',
         'list.remove': 'Remove',
+        'list.updateTo': 'Update to',
+        'list.suggest': 'Suggestion',
+        'list.updating': 'Updating…',
+        'list.updateDone': '{name} updated to {v}; restart DSH to apply',
+        'list.updateFailed': 'Update failed',
+        'list.updateUnavailable': 'This DSH version cannot update from the panel; use the dsh plugin command',
+        'list.updateRejected': '{v} was rejected — it may not support this DSH version or is not a plugin package',
         'list.confirmRemove': 'Confirm',
         'list.removeCancelled': 'Remove cancelled',
         'list.retry': 'Retry',
@@ -1266,22 +1282,34 @@ window.__ModuleLoader__.load({
     }
 
     /** 健康度标签：绿=健康，黄=有建议，红=需修复。 */
-    function healthChip(title, diagnosis, copied, onCopy) {
+    /** 语义化版本比较：返回 >0 表示 a 比 b 新。只处理 x.y.z 和预发布后缀。 */
+    function compareVersion(a, b) {
+      const norm = (v) => String(v || '').trim().replace(/^v/, '').split(/[.+-]/).slice(0, 3).map((n) => parseInt(n, 10) || 0)
+      const x = norm(a)
+      const y = norm(b)
+      for (let i = 0; i < 3; i += 1) {
+        if (x[i] !== y[i]) return x[i] - y[i]
+      }
+      return 0
+    }
+
+    function healthChip(title, diagnosis, copied, onCopy, t) {
       const level = diagnosis && diagnosis.level
-      if (!level || level === 'unknown') return null
+      // 没问题就不显示任何标签——「健康」两个字本身是噪音
+      if (!level || level === 'unknown' || level === 'ok') return null
       const items = (diagnosis.items || [])
-      const bad = items.filter((i) => i.level === 'bad').length
-      const warn = items.filter((i) => i.level === 'warn').length
-      const text = level === 'bad' ? `健康度差 ${bad}` : level === 'warn' ? `建议 ${warn}` : '健康'
+      // 一律当建议看：数出所有待改项，不分「差」和「建议」两档
+      const count = items.filter((i) => i.level === 'bad' || i.level === 'warn').length
+      if (!count) return null
       return h('button', {
         type: 'button',
-        className: `dsh-pl-health is-${level}${copied ? ' is-copied' : ''}`,
-        title: level === 'ok' ? '元信息完整' : '点击复制体检结果，可直接发给 AI 修正',
+        className: `dsh-pl-health is-warn${copied ? ' is-copied' : ''}`,
+        title: '点击复制体检结果，可直接发给 AI 修改',
         onClick: (event) => {
           event.stopPropagation()
           onCopy()
         },
-      }, copied ? '已复制' : text)
+      }, copied ? textOf(t, 'list.copied') : `${textOf(t, 'list.suggest')} ${count}`)
     }
 
     function compactNumber(value) {
@@ -1432,6 +1460,7 @@ window.__ModuleLoader__.load({
       const [hotStatus, setHotStatus] = React.useState('')
       const [plugins, setPlugins] = React.useState([])
       const [bundles, setBundles] = React.useState([])
+      const [versionMap, setVersionMap] = React.useState({})
       const [status, setStatus] = React.useState(listPlugins ? 'loading' : 'unavailable')
       const [error, setError] = React.useState('')
       const [selectedId, setSelectedId] = React.useState('')
@@ -1447,6 +1476,38 @@ window.__ModuleLoader__.load({
         pref.current = { ...pref.current, ...next }
         savePref(pref.current)
       }
+
+      /**
+       * 查已装包有没有新版，只用官方接口：
+       *
+       * 1. `listBundles()` 的 `update` 字段已经告诉 DSH「这个包有可更新版本」，
+       *    没有这个标记的包不查，省掉绝大多数请求。
+       * 2. 对标记过的包调 `listVersions()`，它会校验 DSH 兼容性、bundle 声明和废弃标记。
+       */
+      React.useEffect(() => {
+        const listOne = props.listVersions
+        if (typeof listOne !== 'function') return
+        const targets = bundles.filter((b) => b && b.installed !== false && b.update && typeof b.name === 'string' && b.name)
+        if (!targets.length) {
+          setVersionMap({})
+          return
+        }
+        let alive = true
+        Promise.all(targets.map((b) => Promise.resolve(listOne(b.name)).catch(() => null))).then((rows) => {
+          if (!alive) return
+          const map = {}
+          rows.forEach((row, i) => {
+            if (!row || row.status !== 'listed') return
+            const bundle = targets[i]
+            const current = row.installed || bundle.version || ''
+            const newer = (row.versions || []).filter((v) => !v.incompatible && !v.deprecated && compareVersion(v.version, current) > 0)
+            if (!newer.length) return
+            map[bundle.name] = { version: newer[0].version, registry: row.registry || null }
+          })
+          setVersionMap(map)
+        }).catch(() => {})
+        return () => { alive = false }
+      }, [bundles, props.listVersions])
 
       const load = React.useCallback(async () => {
         if (!listPlugins) {
@@ -2112,6 +2173,43 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /** 装新版本：走 DSH 的 updateBundle，成功后重新读列表。 */
+      async function runUpdate(bundle, info) {
+        const call = props.updateBundle
+        if (typeof call !== 'function') {
+          setActionNote(textOf(t, 'list.updateUnavailable'))
+          return
+        }
+        if (busyKey) return
+        setBusyKey(bundle.name)
+        setActionNote('')
+        try {
+          const options = info && info.registry ? { registry: info.registry } : {}
+          const answer = await call(bundle.name, info.version, options)
+          // PluginUpdateResult: { step, result: ChangeResult, restore? }
+          const change = answer && answer.result
+          if (change && change.application === 'failed') {
+            const error = change.error || {}
+            setFailedKey(bundle.name)
+            setActionNote(`${textOf(t, 'list.updateFailed')}：${error.code || error.diagnostic || 'unknown'}`)
+            return
+          }
+          if (answer && answer.step === 'check') {
+            // 停在检查步骤，说明版本没被接受
+            setFailedKey(bundle.name)
+            setActionNote(textOf(t, 'list.updateRejected').replace('{v}', info.version))
+            return
+          }
+          showToast(textOf(t, 'list.updateDone').replace('{name}', bundle.name).replace('{v}', info.version))
+          setTimeout(() => { void load() }, 600)
+        } catch (failure) {
+          setFailedKey(bundle.name)
+          setActionNote(`${textOf(t, 'list.updateFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        } finally {
+          setBusyKey('')
+        }
+      }
+
       function designView() {
         const section = SPEC_SECTIONS.find((s) => s.id === specTab) || SPEC_SECTIONS[0]
         return h('div', { className: 'dsh-pl-market' },
@@ -2501,7 +2599,26 @@ window.__ModuleLoader__.load({
                         actions: [
                           healthChip(title, diagnoses[plugin.entryId], copiedKey === plugin.entryId, () => {
                             void copyDiagnosis(plugin, title, diagnoses[plugin.entryId])
-                          }),
+                          }, t),
+                          (() => {
+                            const bundle = matchBundle(plugin, bundles)
+                            if (!bundle || !bundle.name) return null
+                            const info = versionMap[bundle.name]
+                            const current = bundle.version
+                            if (!info || !current || compareVersion(info.version, current) <= 0) return null
+                            return h('button', {
+                              key: 'update',
+                              type: 'button',
+                              className: 'dsh-pl-card-btn is-update',
+                              disabled: busyKey === bundle.name,
+                              onClick: (event) => {
+                                event.stopPropagation()
+                                void runUpdate(bundle, info)
+                              },
+                            }, busyKey === bundle.name
+                              ? textOf(t, 'list.updating')
+                              : `${textOf(t, 'list.updateTo')} ${info.version}`)
+                          })(),
                           (() => {
                             const bundle = matchBundle(plugin, bundles)
                             if (!bundle || !bundle.removable) return null
@@ -2592,8 +2709,9 @@ window.__ModuleLoader__.load({
 .dsh-pl-health { flex: none; margin-left: 0; padding: 4px 9px; border: 0; border-radius: var(--pl-radius-chip); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; white-space: nowrap; }
 .dsh-pl-health.is-ok { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); cursor: default; }
 .dsh-pl-health.is-warn { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-warn-label); }
-.dsh-pl-health.is-bad { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-health.is-copied { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-card-btn.is-update { border-color: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-state-business-primary); }
+.dsh-pl-card-btn.is-update:disabled { opacity: 0.5; }
 .dsh-pl-card-btn.is-danger { color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-list-note { margin: 10px 12px 0; }
 .dsh-pl-toast { display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-sm); line-height: 1.5; animation: dsh-pl-toast-in 160ms ease-out; }
@@ -2717,6 +2835,12 @@ window.__ModuleLoader__.load({
         const loadMarketTrend = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'trend', payload || {})
         const loadMarketHot = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'hot', payload || {})
         const searchCatalog = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'search', payload || {})
+        const updateBundle = typeof pluginManager.updateBundle === 'function'
+          ? pluginManager.updateBundle.bind(pluginManager)
+          : null
+        const listVersions = typeof pluginManager.listVersions === 'function'
+          ? pluginManager.listVersions.bind(pluginManager)
+          : null
         const diagnosePlugins = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'diagnose', payload || {})
         const installBundle = pluginManager.installBundle.bind(pluginManager)
         const removeBundle = pluginManager.removeBundle.bind(pluginManager)
@@ -2803,7 +2927,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }
