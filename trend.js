@@ -467,23 +467,30 @@ async function buildCatalogIndex() {
   return { v: SEARCH_INDEX_VERSION, latest: tag || latest, rows }
 }
 
-async function collectSearch(readCache, writeCache, query, limit = 100, sort = 'hot') {
+async function collectSearch(readCache, writeCache, query, limit = 100, sort = 'hot', options = {}) {
   const needle = String(query || '').trim().toLowerCase()
-  if (!needle) return { query: '', items: [], total: 0 }
+  const category = typeof options.category === 'string' ? options.category : ''
+  if (!needle && !category) return { query: '', items: [], total: 0, refreshed: false }
 
   let index = readCache()
-  const stale = !index
+  const missing = !index
     || index.v !== SEARCH_INDEX_VERSION
     || !Array.isArray(index.rows)
     || !index.rows.length
-  if (stale) {
+
+  let refreshed = false
+  if (missing) {
+    // 首次使用或索引格式变更：必须建一次
     index = await buildCatalogIndex()
     writeCache(index)
-  } else {
+    refreshed = true
+  } else if (options.checkVersion === true) {
+    // 只有显式要求时才联网确认目录版本（「刷新」按钮）。日常搜索完全走本地。
     const tag = await latestTag()
     if (tag && index.latest !== tag) {
       index = await buildCatalogIndex()
       writeCache(index)
+      refreshed = true
     }
   }
 
@@ -494,17 +501,33 @@ async function collectSearch(readCache, writeCache, query, limit = 100, sort = '
 
   const matched = []
   for (const row of index.rows) {
+    if (category && row.category !== category) continue
+    if (!needle) { matched.push(row); continue }
     const haystack = `${row.name} ${row.summary} ${row.category} ${row.categoryZh || ''}`.toLowerCase()
     if (terms.some((term) => haystack.includes(term))) matched.push(row)
   }
 
-  if (sort === 'hot') {
-    matched.sort((a, b) => (b.stars || 0) - (a.stars || 0))
-  } else if (sort === 'new') {
+  // 排序独立于分类：选了分类照样能切「最热 / 最新」
+  if (sort === 'new') {
     matched.sort((a, b) => String(b.publishedAt || b.added || '').localeCompare(String(a.publishedAt || a.added || '')))
+  } else {
+    matched.sort((a, b) => (b.stars || 0) - (a.stars || 0))
   }
 
-  return { query, sort, items: matched.slice(0, limit), total: matched.length }
+  const offset = Math.max(0, Number(options.offset) || 0)
+  const total = matched.length
+  const page = matched.slice(offset, offset + limit)
+  return {
+    query,
+    sort,
+    category,
+    refreshed,
+    total,
+    offset,
+    limit,
+    pageCount: Math.max(1, Math.ceil(total / limit)),
+    items: page,
+  }
 }
 
 export { collectTrend, collectHot, collectSearch }

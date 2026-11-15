@@ -235,7 +235,10 @@ function readSearch(payload) {
   const input = payload && typeof payload === 'object' ? payload : {}
   const query = typeof input.query === 'string' ? input.query : ''
   const sort = input.sort === 'new' ? 'new' : 'hot'
-  return collectSearch(readSearchCache, writeSearchCache, query, 100, sort)
+  const category = typeof input.category === 'string' ? input.category : ''
+  const checkVersion = input.refresh === true
+  const offset = Number.isFinite(Number(input.offset)) ? Math.max(0, Math.floor(Number(input.offset))) : 0
+  return collectSearch(readSearchCache, writeSearchCache, query, 100, sort, { category, checkVersion, offset })
 }
 
 /**

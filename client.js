@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.10'
+    const VERSION = 'v0.1.11'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
         'list.installed': '用户安装',
         'list.builtin': '系统内置',
         'list.refresh': '刷新',
-        'list.market': '市场趋势',
+        'list.market': '插件市场',
         'list.featured': '精选推荐',
         'list.design': '设计规范',
         'list.about': '关于',
@@ -64,23 +64,35 @@ window.__ModuleLoader__.load({
         'list.hotRepo': '仓库',
         'list.installedState': '已安装',
         'list.notInstalled': '未安装',
-        'list.chartTitle': '插件市场的增长趋势',
+        'list.chartTitle': '插件市场增长趋势',
         'list.chartCumulative': '累计',
         'list.chartDaily': '每日增量',
         'list.chartDailyHint': '每天新增多少，比累计更能看出快慢',
+        'list.marketSearchTitle': '搜索整个市场',
         'list.marketSearch': '搜索整个市场，支持中文，例如「记忆」「截图」',
         'list.marketSearching': '搜索中…',
         'list.searchError': '搜索暂时不可用。如果刚更新过插件，在插件管理里停用再启用一次即可。',
         'list.marketNoMatch': '没有找到匹配的插件',
+        'list.categoryAll': '全部',
+        'list.categoryTool': '工具',
+        'list.categoryUi': '界面',
+        'list.categoryIntegration': '集成',
+        'list.categoryWorkflow': '工作流',
+        'list.categoryProvider': '模型接入',
+        'list.categoryTheme': '主题',
+        'list.categoryOther': '其他',
         'list.marketHits': '找到 {n} 个',
         'list.sortHot': '最热',
         'list.sortNew': '最新',
+        'list.pagePrev': '上一页',
+        'list.pageNext': '下一页',
+        'list.pageInfo': '第 {page} / {pages} 页',
         'list.hotSearch': '搜索插件名、说明或分类…',
         'list.hotNoMatch': '没有匹配的插件',
-        'list.featuredLead': '所列插件均经实际安装与使用后收录。',
-        'list.featuredPending': '仍在持续筛选，后续陆续更新。',
+        'list.featuredTag': '精选',
+        'list.featuredFoot': '如需推荐插件，或希望自己的插件被收录，欢迎微信联系：ruskacoffee',
         'list.featuredContact': '如需推荐插件，或希望自己的插件被收录，欢迎微信联系：ruskacoffee',
-        'list.hotTitle': '最近 7 天增长最快',
+        'list.hotTitle': '最近 7 天增长最快的插件',
         'list.hotHint': '按 GitHub 仓库 star 的 7 天增量排序，同一仓库只算一次。',
         'list.hotLoading': '正在算增长…',
         'list.hotError': '取不到增长数据。如果刚更新插件，需要重启一次 DeepSeek Harness 才会启用这个榜单。',
@@ -155,7 +167,7 @@ window.__ModuleLoader__.load({
         'list.installed': 'Installed',
         'list.builtin': 'Built-in',
         'list.refresh': 'Refresh',
-        'list.market': 'Market trends',
+        'list.market': 'Plugin market',
         'list.featured': 'Featured',
         'list.design': 'Design spec',
         'list.about': 'About',
@@ -206,19 +218,29 @@ window.__ModuleLoader__.load({
         'list.chartCumulative': 'Total',
         'list.chartDaily': 'Per day',
         'list.chartDailyHint': 'New plugins per day, which shows pace better than a total',
+        'list.marketSearchTitle': 'Search the whole market',
         'list.marketSearch': 'Search the whole market, Chinese works too',
         'list.marketSearching': 'Searching…',
         'list.searchError': 'Search is unavailable. If you just updated the plugin, disable and re-enable it once.',
         'list.marketNoMatch': 'No matching plugin',
+        'list.categoryAll': 'All',
+        'list.categoryTool': 'Tools',
+        'list.categoryUi': 'UI',
+        'list.categoryIntegration': 'Integration',
+        'list.categoryWorkflow': 'Workflow',
+        'list.categoryProvider': 'Providers',
+        'list.categoryTheme': 'Themes',
+        'list.categoryOther': 'Other',
         'list.marketHits': '{n} found',
         'list.sortHot': 'Popular',
         'list.sortNew': 'Newest',
+        'list.pagePrev': 'Previous',
+        'list.pageNext': 'Next',
+        'list.pageInfo': 'Page {page} of {pages}',
         'list.hotSearch': 'Search by name, description or category…',
         'list.hotNoMatch': 'No matching plugin',
-        'list.featuredLead': 'Listed plugins were installed and used before being included.',
-        'list.featuredPending': 'Still being curated; more will be added.',
         'list.featuredContact': 'To suggest a plugin or have yours listed, contact us on WeChat: ruskacoffee',
-        'list.hotTitle': 'Fastest growing, last 7 days',
+        'list.hotTitle': 'Fastest growing plugins, last 7 days',
         'list.hotHint': 'Ranked by 7-day GitHub repository star delta; one row per repository.',
         'list.hotLoading': 'Crunching growth…',
         'list.hotError': 'Could not load growth data. Restart DeepSeek Harness once to enable this ranking.',
@@ -462,7 +484,7 @@ window.__ModuleLoader__.load({
           return h('rect', {
             key: `b${i}`, x: x(i) - barW / 2, y: top, width: barW, height,
             rx: Math.min(2, barW / 2),
-            fill: 'var(--dsw-alias-brand-primary)',
+            fill: 'var(--dsw-alias-state-business-primary)',
             opacity: hovered === i ? 0.95 : 0.55,
           })
         }),
@@ -535,8 +557,8 @@ window.__ModuleLoader__.load({
           key: `t${i}`, x: L - 12, y: y(tick) + 6, textAnchor: 'end',
           fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
         }, `${Math.round(tick / 1000)}k`)),
-        h('path', { d: area, fill: 'var(--dsw-alias-brand-primary)', opacity: 0.08 }),
-        h('path', { d: line, fill: 'none', stroke: 'var(--dsw-alias-brand-primary)', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+        h('path', { d: area, fill: 'var(--dsw-alias-state-business-primary)', opacity: 0.08 }),
+        h('path', { d: line, fill: 'none', stroke: 'var(--dsw-alias-state-business-primary)', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
         labelIndexes.map((i) => h('text', {
           key: `d${i}`, x: x(i), y: H - B + 34, textAnchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
           fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
@@ -550,7 +572,7 @@ window.__ModuleLoader__.load({
             x1: hx, x2: hx, y1: T, y2: H - B,
             stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.5,
           }),
-          h('circle', { cx: hx, cy: hy, r: 4.5, fill: 'var(--dsw-alias-brand-primary)', stroke: '#fff', strokeWidth: 2 }),
+          h('circle', { cx: hx, cy: hy, r: 4.5, fill: 'var(--dsw-alias-state-business-primary)', stroke: 'var(--dsw-alias-bg-layer-1)', strokeWidth: 2 }),
           h('rect', {
             x: boxX, y: boxY, width: boxW, height: boxH, rx: 10,
             fill: 'var(--dsw-alias-bg-overlay)', stroke: 'var(--dsw-alias-border-l2)', strokeWidth: 1,
@@ -1160,6 +1182,37 @@ window.__ModuleLoader__.load({
       '- [ ] 重新构建 + 重启 DSH 后确认',
     ].join('\n')
 
+    /** 目录的 7 个分类；`id` 是目录里的字段值，空串表示不过滤。 */
+    const CATEGORIES = [
+      { id: '', labelKey: 'list.categoryAll' },
+      { id: 'tool', labelKey: 'list.categoryTool' },
+      { id: 'ui', labelKey: 'list.categoryUi' },
+      { id: 'integration', labelKey: 'list.categoryIntegration' },
+      { id: 'workflow', labelKey: 'list.categoryWorkflow' },
+      { id: 'provider', labelKey: 'list.categoryProvider' },
+      { id: 'theme', labelKey: 'list.categoryTheme' },
+      { id: 'other', labelKey: 'list.categoryOther' },
+    ]
+
+    /**
+     * 主编精选：都是自己装过、用过的插件。
+     *
+     * 数量刻意少——精选的价值在「少而准」，不在「多而全」。
+     * 加一条就改这里，`reason` 写清「为什么值得装」，不要复述插件自己的描述。
+     */
+    const CURATED = [
+      {
+        name: 'dsh-meeting-memo',
+        title: '会议纪要',
+        reason: '录音存在本机、转写也在本机，不上传任何云服务。会开完直接拿到要点、决策和待办，不用回头翻录像。',
+      },
+      {
+        name: 'dsh-pocket-ios',
+        title: 'DSH Pocket iOS（手机访问）',
+        reason: '把 DSH 装进手机：扫码就连上桌面的会话，能看进度、批工具调用、发消息。走局域网或内网穿透，不需要密码，也不经过任何第三方中转。',
+      },
+    ]
+
     /** 三段场景规范；`id` 用于复制态的区分。 */
     const SPEC_SECTIONS = [
       { id: 'new', title: '新建插件', hint: '从零到能装：命名、骨架、清单、元信息、自检', text: SPEC_NEW },
@@ -1364,6 +1417,9 @@ window.__ModuleLoader__.load({
       const [copiedKey, setCopiedKey] = React.useState('')
       const [toast, setToast] = React.useState('')
       const [specTab, setSpecTab] = React.useState('new')
+      const [marketCategory, setMarketCategory] = React.useState('')
+      const [searchPage, setSearchPage] = React.useState(0)
+      const [searchMeta, setSearchMeta] = React.useState(null)
       const toastTimer = React.useRef(null)
       const [selectedMarket, setSelectedMarket] = React.useState(null)
       const [chartMode, setChartMode] = React.useState('cumulative')
@@ -1952,16 +2008,18 @@ window.__ModuleLoader__.load({
 
       const searchTimer = React.useRef(null)
 
-      const runMarketSearch = React.useCallback((query, sort) => {
+      const runMarketSearch = React.useCallback((query, sort, category, page) => {
         const call = props.searchCatalog
         if (typeof call !== 'function') return
-        if (!query.trim()) {
+        const cat = category === undefined ? marketCategory : category
+        if (!query.trim() && !cat) {
           setSearchResult(null)
           setSearchStatus('')
           return
         }
         setSearchStatus('loading')
-        Promise.resolve(call({ query, sort: sort || 'hot' })).then((result) => {
+        const offset = Math.max(0, Number(page) || 0)
+        Promise.resolve(call({ query, sort: sort || 'hot', category: cat, offset })).then((result) => {
           if (result && result.ok === false) {
             setSearchResult(null)
             setSearchStatus('error')
@@ -1969,17 +2027,19 @@ window.__ModuleLoader__.load({
           }
           const value = result && result.ok === true ? result.value : result
           setSearchResult(value && Array.isArray(value.items) ? value.items : [])
+          setSearchMeta(value ? { total: value.total || 0, offset: value.offset || 0, limit: value.limit || 100, pageCount: value.pageCount || 1 } : null)
           setSearchStatus('ready')
         }).catch(() => {
           setSearchResult(null)
           setSearchStatus('error')
         })
-      }, [props.searchCatalog, searchSort])
+      }, [props.searchCatalog, searchSort, marketCategory])
 
       function onMarketQuery(value) {
         setMarketQuery(value)
         if (searchTimer.current) clearTimeout(searchTimer.current)
-        searchTimer.current = setTimeout(() => runMarketSearch(value, searchSort), 300)
+        setSearchPage(0)
+        searchTimer.current = setTimeout(() => runMarketSearch(value, searchSort, marketCategory, 0), 300)
       }
 
       /** 「关于」页：这个插件是什么、基本事实、怎么分享给别人。 */
@@ -2055,16 +2115,23 @@ window.__ModuleLoader__.load({
       function designView() {
         const section = SPEC_SECTIONS.find((s) => s.id === specTab) || SPEC_SECTIONS[0]
         return h('div', { className: 'dsh-pl-market' },
-          h('div', { className: 'dsh-pl-spec-bar' },
-            h('div', { className: 'dsh-pl-seg', role: 'tablist', 'aria-label': 'spec section' },
-              SPEC_SECTIONS.map((item) => chip(item.id, item.title, specTab, (id) => setSpecTab(id)))),
-            h('button', {
-              type: 'button',
-              className: 'dsh-pl-copy-spec',
-              onClick: () => { void copySpec(section) },
-            }, copiedKey === `spec-${section.id}` ? textOf(t, 'list.copied') : textOf(t, 'list.designCopy'))),
-          h('p', { className: 'dsh-pl-note' }, section.hint),
-          markdownView(section.text))
+          h('section', { className: 'dsh-pl-spec' },
+            h('div', { className: 'dsh-pl-spec-head' },
+              h('div', { className: 'dsh-pl-spec-tabs', role: 'tablist', 'aria-label': 'spec section' },
+                SPEC_SECTIONS.map((item) => h('button', {
+                  key: item.id,
+                  type: 'button',
+                  className: `dsh-pl-spec-tab${item.id === specTab ? ' is-on' : ''}`,
+                  'aria-selected': item.id === specTab,
+                  onClick: () => setSpecTab(item.id),
+                }, item.title))),
+              h('button', {
+                type: 'button',
+                className: 'dsh-pl-copy-spec',
+                onClick: () => { void copySpec(section) },
+              }, copiedKey === `spec-${section.id}` ? textOf(t, 'list.copied') : textOf(t, 'list.designCopy'))),
+            h('p', { className: 'dsh-pl-spec-hint' }, section.hint),
+            h('div', { className: 'dsh-pl-spec-body' }, markdownView(section.text))))
       }
 
       async function copySpec(section) {
@@ -2091,10 +2158,124 @@ window.__ModuleLoader__.load({
 
       function featuredView() {
         return h('div', { className: 'dsh-pl-market' },
-          h('div', { className: 'dsh-pl-featured' },
-            h('p', { className: 'dsh-pl-featured-lead' }, textOf(t, 'list.featuredLead')),
-            h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.featuredPending')),
-            h('p', { className: 'dsh-pl-featured-contact' }, withAccent(textOf(t, 'list.featuredContact'), 'ruskacoffee'))))
+          h('div', { className: 'dsh-pl-curated-list' }, CURATED.map((item) => {
+            const installed = isInstalled(item.name)
+            const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
+            const icon = safeIcon(plugin && plugin.meta && plugin.meta.icon)
+            return h(PluginCard, {
+              key: item.name,
+              icon: icon ? h('img', { src: icon, alt: '', draggable: false }) : h(DefaultPluginIcon),
+              title: item.title,
+              subtitle: item.reason,
+              className: 'is-market is-curated',
+              badge: h('span', { className: 'dsh-pl-curated-tag' }, textOf(t, 'list.featuredTag')),
+              actions: [
+                h('button', {
+                  key: 'act',
+                  type: 'button',
+                  className: 'dsh-pl-card-btn',
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    if (installed) return
+                    void installFromMarket(item.name)
+                  },
+                }, installed ? textOf(t, 'list.installedState') : textOf(t, 'list.install')),
+              ],
+            })
+          })),
+          h('p', { className: 'dsh-pl-note dsh-pl-featured-foot' }, textOf(t, 'list.featuredContact')))
+      }
+
+      /** 「关于」页：这个插件是什么、基本事实、怎么分享给别人。 */
+      function aboutView() {
+        const profileDir = '~/.dsh/profiles/<profile>/.plugin-panel'
+        const facts = [
+          [textOf(t, 'list.aboutPackage'), 'dsh-plugin-panel'],
+          [textOf(t, 'list.aboutVersion'), VERSION],
+          [textOf(t, 'list.aboutLicense'), 'MIT'],
+          [textOf(t, 'list.aboutRepo'), 'github.com/jqlong17/dsh-plugin-panel'],
+          [textOf(t, 'list.aboutData'), profileDir],
+        ]
+        return h('div', { className: 'dsh-pl-market' },
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutWhat')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody1')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody2'))),
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutFacts')),
+            h('div', { className: 'dsh-pl-about-facts' },
+              facts.map(([label, value]) => h('div', { className: 'dsh-pl-about-fact', key: label },
+                h('span', { className: 'dsh-pl-about-label' }, label),
+                h('span', { className: 'dsh-pl-about-value' }, value))))),
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutShare')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutShareHint')),
+            h('pre', { className: 'dsh-pl-about-pre' }, shareText()),
+            h('button', {
+              type: 'button',
+              className: 'dsh-pl-about-copy',
+              onClick: () => { void copyShare() },
+            }, copiedKey === 'about' ? textOf(t, 'list.copied') : textOf(t, 'list.aboutCopy'))))
+      }
+
+      function shareText() {
+        return [
+          `请帮我在 DeepSeek Harness 上安装插件 dsh-plugin-panel（中文名「插件管理」，版本 ${VERSION}）。`,
+          '',
+          '它是右侧栏的插件管理器：列出已安装插件并标出入口，带插件市场（增长趋势、7 天增长榜、中文搜索、一键装卸），以及每个插件的元信息体检。',
+          '',
+          '请按顺序做，每步做完告诉我结果：',
+          '',
+          '1. 确认当前 DSH 的 profile 名称（一般看 ~/.dsh/profiles/ 下哪个是你在用的）。',
+          '2. 安装：dsh plugin --profile <你的 profile> add dsh-plugin-panel',
+          '   如果 npm 上取不到这个包，说明还没发布，请直接告诉我，别自己改写依赖或去装同名的其它包。',
+          '3. 装完提醒我重启 DeepSeek Harness，然后打开右侧栏确认「插件管理」出现。',
+        ].join('\n')
+      }
+
+      async function copyShare() {
+        const text = shareText()
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text)
+          } else {
+            const area = document.createElement('textarea')
+            area.value = text
+            area.style.position = 'fixed'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            document.execCommand('copy')
+            document.body.removeChild(area)
+          }
+          setCopiedKey('about')
+          showToast(textOf(t, 'list.aboutCopied'))
+          setTimeout(() => setCopiedKey(''), 2200)
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
+      }
+
+      async function copySpec(section) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(section.text)
+          } else {
+            const area = document.createElement('textarea')
+            area.value = section.text
+            area.style.position = 'fixed'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            document.execCommand('copy')
+            document.body.removeChild(area)
+          }
+          setCopiedKey(`spec-${section.id}`)
+          showToast(textOf(t, 'list.designCopied').replace('{name}', section.title))
+          setTimeout(() => setCopiedKey(''), 2200)
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
       }
 
       function marketDetail(row) {
@@ -2135,15 +2316,49 @@ window.__ModuleLoader__.load({
           : 0
         const perDay = first && last ? Math.round((last.count - first.count) / Math.max(span, 1)) : 0
         const query = marketQuery.trim()
-        const searchBox = h('input', {
-          type: 'search',
-          className: 'dsh-pl-search',
-          placeholder: textOf(t, 'list.marketSearch'),
-          value: marketQuery,
-          onChange: (event) => onMarketQuery(event.target.value),
-        })
-        if (query) {
+        const categoryBar = h('div', { className: 'dsh-pl-cats', role: 'group', 'aria-label': 'category' },
+          CATEGORIES.map((item) => h('button', {
+            key: item.id || 'all',
+            type: 'button',
+            className: `dsh-pl-cat${marketCategory === item.id ? ' is-on' : ''}`,
+            'aria-pressed': marketCategory === item.id,
+            onClick: () => {
+              setMarketCategory(item.id)
+              setSearchPage(0)
+              runMarketSearch(marketQuery, searchSort, item.id, 0)
+            },
+          }, textOf(t, item.labelKey))))
+        const searchBox = h('div', { className: 'dsh-pl-search-wrap' },
+          h('div', { className: 'dsh-pl-block-head' }, h('strong', null, textOf(t, 'list.marketSearchTitle'))),
+          h('input', {
+            type: 'search',
+            className: 'dsh-pl-search',
+            placeholder: textOf(t, 'list.marketSearch'),
+            value: marketQuery,
+            onChange: (event) => onMarketQuery(event.target.value),
+          }),
+          categoryBar)
+        if (query || marketCategory) {
           const items = Array.isArray(searchResult) ? searchResult : []
+          const meta = searchMeta
+          const currentPage = meta ? Math.floor((meta.offset || 0) / (meta.limit || 100)) + 1 : 1
+          const pager = meta && meta.pageCount > 1
+            ? h('div', { className: 'dsh-pl-pager' },
+              h('button', {
+                type: 'button',
+                className: 'dsh-pl-pager-btn',
+                disabled: currentPage <= 1,
+                onClick: () => { const next = searchPage - 1; setSearchPage(next); runMarketSearch(marketQuery, searchSort, marketCategory, next) },
+              }, textOf(t, 'list.pagePrev')),
+              h('span', { className: 'dsh-pl-pager-info' },
+                textOf(t, 'list.pageInfo').replace('{page}', String(currentPage)).replace('{pages}', String(meta.pageCount))),
+              h('button', {
+                type: 'button',
+                className: 'dsh-pl-pager-btn',
+                disabled: currentPage >= meta.pageCount,
+                onClick: () => { const next = searchPage + 1; setSearchPage(next); runMarketSearch(marketQuery, searchSort, marketCategory, next) },
+              }, textOf(t, 'list.pageNext')))
+            : null
           return h('div', { className: 'dsh-pl-market' },
             searchBox,
             searchStatus === 'loading'
@@ -2154,10 +2369,10 @@ window.__ModuleLoader__.load({
                   ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketNoMatch'))
                   : h('div', null,
                     h('div', { className: 'dsh-pl-block-head' },
-                      h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(items.length))),
+                      h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(searchMeta ? searchMeta.total : items.length).replace(/\B(?=(\d{3})+(?!\d))/g, ','))),
                       h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'sort' },
-                        chip('hot', textOf(t, 'list.sortHot'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }),
-                        chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); runMarketSearch(marketQuery, id) }))),
+                        chip('hot', textOf(t, 'list.sortHot'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) }),
+                        chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) }))),
                     h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                       items.map((row, index) => h(PluginCard, {
                         key: row.name || index,
@@ -2171,7 +2386,8 @@ window.__ModuleLoader__.load({
                         })(),
                         onClick: () => setSelectedMarket(row),
                         actions: [hotAction(row)],
-                      })))))
+                      })))),
+                    pager)
         }
         return h('div', { className: 'dsh-pl-market' },
           searchBox,
@@ -2354,10 +2570,12 @@ window.__ModuleLoader__.load({
 .dsh-pl-view button { border: 0; border-radius: var(--pl-radius-pill); padding: 3px 8px; font-size: var(--pl-fs-xs); background: transparent; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-view button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; }
 .dsh-pl-seg { display: flex; gap: 2px; padding: 3px; border: 0; border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl :focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
+.dsh-pl-item:focus-visible { outline-offset: 1px; }
 .dsh-pl button { font: inherit; font-size: var(--pl-fs-sm); line-height: 1.2; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); padding: 6px 12px; cursor: pointer; }
 .dsh-pl-seg button { border: 0; border-radius: var(--pl-radius-pill); background: transparent; color: var(--dsw-alias-label-secondary); padding: 5px 12px; }
 .dsh-pl-seg button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; box-shadow: none; }
-.dsh-pl-item.is-on { border-color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: inset 0 0 0 1px var(--dsw-alias-brand-primary); }
+.dsh-pl-item.is-on { border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary); }
 .dsh-pl-body { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
 .dsh-pl-rows, .dsh-pl-grid { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 8px; }
 .dsh-pl-rows { display: flex; flex-direction: column; gap: 6px; }
@@ -2399,7 +2617,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-fact-label { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-sm); line-height: 1.45; }
 .dsh-pl-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .dsh-pl-tag { padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
-.dsh-pl-link { color: var(--dsw-alias-brand-primary); text-decoration: none; }
+.dsh-pl-link { color: var(--dsw-alias-state-business-primary); text-decoration: none; }
 .dsh-pl-link:hover { text-decoration: underline; }
 .dsh-pl-fact-value { color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-md); line-height: 1.45; overflow-wrap: anywhere; }
 .dsh-pl-detail h3 { margin: 14px 0 6px; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
@@ -2411,28 +2629,31 @@ window.__ModuleLoader__.load({
 .dsh-pl-md p, .dsh-pl-md li { margin: 0 0 8px; font-size: var(--pl-fs-md); line-height: 1.55; }
 .dsh-pl-md ul { margin: 0 0 10px; padding-left: 18px; }
 .dsh-pl-md code { font-size: var(--pl-fs-sm); padding: 0 4px; border-radius: 4px; background: var(--dsw-alias-bg-layer-2); }
-.dsh-pl-md a { color: var(--dsw-alias-brand-primary); }
+.dsh-pl-md a { color: var(--dsw-alias-state-business-primary); }
 .dsh-pl-table-wrap { margin: 8px 0 14px; overflow-x: auto; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); }
+.dsh-pl-md pre { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--pl-fs-xs); line-height: 1.75; overflow-x: auto; }
+.dsh-pl-md pre code { padding: 0; background: transparent; font-size: inherit; font-family: inherit; }
+.dsh-pl-md blockquote { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-2); border-radius: 0 var(--pl-radius-chip) var(--pl-radius-chip) 0; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-md table { width: 100%; border-collapse: collapse; font-size: var(--pl-fs-md); }
 .dsh-pl-md th, .dsh-pl-md td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .dsh-pl-md th { color: var(--dsw-alias-label-secondary); font-weight: 650; background: var(--dsw-alias-bg-layer-1); white-space: nowrap; }
 .dsh-pl-md td:first-child { white-space: nowrap; }
 .dsh-pl-md tr:last-child td { border-bottom: 0; }
 .dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
-.dsh-pl-featured { padding: 18px 20px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
-.dsh-pl-featured-lead { margin: 0 0 6px; font-size: var(--pl-fs-md); line-height: 1.7; color: var(--dsw-alias-label-primary); }
-.dsh-pl-featured .dsh-pl-note { margin: 0; line-height: 1.7; }
-.dsh-pl-featured-contact { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
-.dsh-pl-accent { color: var(--dsw-alias-brand-primary); font-weight: 600; }
+.dsh-pl-curated-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
+.dsh-pl-item.is-curated { min-height: 78px; align-items: flex-start; }
+.dsh-pl-item.is-curated .dsh-pl-copy strong { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
+.dsh-pl-item.is-curated .dsh-pl-where { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.6; }
+.dsh-pl-curated-list { display: flex; flex-direction: column; gap: 10px; }
+.dsh-pl-featured-foot { margin: 14px 0 0; }
+.dsh-pl-market > .dsh-pl-item.is-curated:first-child { margin-top: 2px; }
+.dsh-pl-accent { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
 .dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-stat strong { font-size: var(--pl-fs-num); font-weight: 600; line-height: 1.2; }
 .dsh-pl-chart-wrap { padding: 10px 12px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-chart { display: block; width: 100%; height: auto; }
-.dsh-pl-spec-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.dsh-pl-spec-bar .dsh-pl-seg { flex: 1 1 auto; min-width: 0; }
-.dsh-pl-spec-bar .dsh-pl-copy-spec { margin-left: auto; }
 .dsh-pl-about { padding: 16px 18px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-about-h { margin: 0 0 10px; font-size: var(--pl-fs-lg); font-weight: 600; color: var(--dsw-alias-label-primary); }
 .dsh-pl-about-p { margin: 0 0 8px; font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
@@ -2444,9 +2665,14 @@ window.__ModuleLoader__.load({
 .dsh-pl-about-pre { margin: 10px 0 12px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--pl-fs-xs); line-height: 1.7; color: var(--dsw-alias-label-secondary); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; }
 .dsh-pl-about-copy { margin-left: auto; display: block; padding: 5px 12px; border: 0; border-radius: var(--pl-radius-chip); background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-on-color); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
 .dsh-pl-about-copy:hover { opacity: 0.9; }
-.dsh-pl-spec { padding: 14px 16px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
-.dsh-pl-spec-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.dsh-pl-spec-hint { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-spec { border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
+.dsh-pl-spec-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-spec-tabs { display: flex; gap: 2px; min-width: 0; overflow: hidden; }
+.dsh-pl-spec-tab { flex: none; padding: 5px 10px; border: 0; border-radius: var(--pl-radius-chip); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-sm); cursor: pointer; white-space: nowrap; }
+.dsh-pl-spec-tab:hover { color: var(--dsw-alias-label-primary); }
+.dsh-pl-spec-tab.is-on { background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-weight: 600; }
+.dsh-pl-spec-hint { margin: 0; padding: 10px 16px 0; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); line-height: 1.6; }
+.dsh-pl-spec-body { padding: 4px 16px 16px; }
 .dsh-pl-copy-spec { flex: none; margin-left: auto; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-chip); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
 .dsh-pl-copy-spec:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -2455,11 +2681,21 @@ window.__ModuleLoader__.load({
 .dsh-pl-block { margin-bottom: 22px; }
 .dsh-pl-market .dsh-pl-note { margin: 10px 2px 0; }
 .dsh-pl-hot { margin-top: 4px; }
-.dsh-pl-search { width: 100%; margin: 2px 0 8px; padding: 8px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); }
+.dsh-pl-search-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.dsh-pl-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0 4px; }
+.dsh-pl-pager-btn { flex: none; padding: 6px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); cursor: pointer; }
+.dsh-pl-pager-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-pager-btn:disabled { opacity: 0.45; cursor: default; }
+.dsh-pl-pager-info { font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+.dsh-pl-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.dsh-pl-cat { flex: none; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-pill); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; white-space: nowrap; }
+.dsh-pl-cat:hover { border-color: var(--dsw-alias-border-l2); color: var(--dsw-alias-label-primary); }
+.dsh-pl-cat.is-on { border-color: transparent; background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-on-color); }
+.dsh-pl-search { width: 100%; margin: 0; padding: 8px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); }
 .dsh-pl-search::placeholder { color: var(--dsw-alias-label-secondary); }
-.dsh-pl-search:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }
+.dsh-pl-search:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 1px; border-color: var(--dsw-alias-state-business-primary); }
 .dsh-pl-metric { flex: none; margin-left: auto; padding-left: 8px; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.dsh-pl-delta { flex: none; margin-left: auto; font-size: var(--pl-fs-sm); font-weight: 600; color: var(--dsw-alias-brand-primary); }
+.dsh-pl-delta { flex: none; margin-left: auto; font-size: var(--pl-fs-sm); font-weight: 600; color: var(--dsw-alias-state-business-primary); }
 .dsh-pl-busy { flex: none; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-hot-busy { flex: none; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
