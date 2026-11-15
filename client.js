@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.8'
+    const VERSION = 'v0.1.9'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -19,6 +19,11 @@ window.__ModuleLoader__.load({
         'list.refresh': '刷新',
         'list.market': '市场趋势',
         'list.featured': '精选推荐',
+        'list.design': '设计规范',
+        'list.designTitle': '插件设计规范',
+        'list.designHint': '按场景选一段复制，粘给任意 AI 即可。所有 token 名都对照 DSH 实际样式表核对过。',
+        'list.designCopy': '复制规范',
+        'list.designCopied': '{name}规范已复制，粘给任意 AI 智能体即可让它照做',
         'list.back': '返回',
         'list.marketTitle': '插件市场趋势',
         'list.marketHint': '来自 dsh-plugin-shop 目录的每日快照，不是 npm 全站统计。',
@@ -138,6 +143,11 @@ window.__ModuleLoader__.load({
         'list.refresh': 'Refresh',
         'list.market': 'Market trends',
         'list.featured': 'Featured',
+        'list.design': 'Design spec',
+        'list.designTitle': 'Plugin design spec',
+        'list.designHint': 'Copy the section that matches your situation and hand it to any AI. Token names are verified against the real DSH stylesheet.',
+        'list.designCopy': 'Copy spec',
+        'list.designCopied': '{name} spec copied — paste it into any agent',
         'list.back': 'Back',
         'list.marketTitle': 'Plugin market trend',
         'list.marketHint': 'Daily snapshots of the dsh-plugin-shop catalog, not a site-wide npm count.',
@@ -723,6 +733,414 @@ window.__ModuleLoader__.load({
       }, text.replace(/^git\+/, ''))
     }
 
+    /**
+     * 插件设计规范（官方风格）。
+     *
+     * 这份文本是**交付物**：用户可以整段复制给任意大模型，让它按规范改插件的
+     * 颜色、间距、圆角和图标。所以写成 Markdown、规则可执行、每条带判断依据。
+     */
+    /**
+     * 设计规范按场景拆成三段，各自可独立复制。
+     *
+     * A 新建：从零到能装，骨架 + 命名 + 元信息 + 自检。
+     * B 视觉：纯样式，颜色/间距/图标/图表。
+     * C 元信息修正：给已经做好的插件逐条对齐，面向体检结果。
+     */
+    const SPEC_NEW = [
+      '# DSH 插件 · 新建清单',
+      '',
+      '从零做到「装上能被正确显示」。按顺序走，走完就能装。',
+      '',
+      '## 一、先定名字',
+      '',
+      '四个名字必须能互相对上：',
+      '',
+      '| 名字 | 写在哪 | 例子 |',
+      '| --- | --- | --- |',
+      '| 中文名 | `locale/zh.json` → `meta.title` | `插件管理` |',
+      '| 英文名 | `locale/en.json` → `meta.title` | `Plugin manager` |',
+      '| 包名 | `package.json` → `name` | `dsh-plugin-panel` |',
+      '| 行标识 | `cordis.patch.yml` → `id` | `dsh-plugin-panel` |',
+      '',
+      '- 中文名 **2–6 字**，名词短语，说「做什么」。不要版本号、不要「测试」后缀',
+      '- 包名全小写 + 连字符，`dsh-` 开头',
+      '- **行标识写包名，不要写相对路径**（`./lib/index.js` 会让宿主读不到 locale，面板永远显示英文名）',
+      '',
+      '## 二、目录骨架',
+      '',
+      '```',
+      'my-plugin/',
+      '├── package.json          清单：入口、dsh 字段、files',
+      '├── cordis.patch.yml      加载行',
+      '├── icon.svg              图标，24×24 描边',
+      '├── locale/',
+      '│   ├── zh.json           meta.title / description / detail',
+      '│   └── en.json',
+      '├── docs/',
+      '│   └── DETAIL.zh.md      详情长文（可被 meta.detail 指向）',
+      '├── src/',
+      '│   ├── index.ts          host 半片：工具、RPC',
+      '│   └── client/           client 半片：面板界面',
+      '└── lib/                  构建产物（不要手改）',
+      '```',
+      '',
+      '## 三、package.json 最小必需',
+      '',
+      '```json',
+      '{',
+      '  "name": "dsh-my-plugin",',
+      '  "version": "0.1.0",',
+      '  "description": "One line in English for npm.",',
+      '  "keywords": ["dsh", "deepseek-harness", "dsh-plugin", "中文关键词"],',
+      '  "exports": {',
+      '    ".": "./lib/index.js",',
+      '    "./client": "./lib/client.js",',
+      '    "./icon": "./icon.svg",',
+      '    "./locale/*.json": "./locale/*.json"',
+      '  },',
+      '  "files": ["lib", "locale/*.json", "icon.svg", "cordis.patch.yml", "docs"],',
+      '  "dsh": {',
+      '    "bundle": { "patch": "./cordis.patch.yml" },',
+      '    "client": {',
+      '      "platform": "web",',
+      '      "inject": ["@deepseek-ai/dsh-client-ui-sidebar-right", "@deepseek-ai/dsh-client-locale"]',
+      '    }',
+      '  }',
+      '}',
+      '```',
+      '',
+      '要点：',
+      '',
+      '- `exports["./icon"]` 必须声明，光有 `icon.svg` 文件不算',
+      '- `files` 必须含 `locale/*.json` 和 `icon.svg`，否则别人装了看不到',
+      '- `dsh.client.inject` 只列代码里真正用到的客户端服务',
+      '- `keywords` 必须有一个中文词',
+      '',
+      '## 四、cordis.patch.yml',
+      '',
+      '```yaml',
+      '- insert:',
+      '    - id: dsh-my-plugin',
+      '      name: dsh-my-plugin',
+      '```',
+      '',
+      '`id` 和 `name` 都写包名。写相对路径会导致 locale 读不到。',
+      '',
+      '## 五、locale 三件套',
+      '',
+      '```json',
+      '{ "meta": {',
+      '    "title": "我的插件",',
+      '    "description": "一句话说清它做什么。",',
+      '    "detail": "docs/DETAIL.zh.md"',
+      '} }',
+      '',
+      '```',
+      '',
+      '- `meta.detail` 相对**包根**解析，不是相对 `locale/`',
+      '- 它指向的文件必须进 `files`',
+      '- `en.json` 结构相同，填英文',
+      '',
+      '## 六、图标',
+      '',
+      '```svg',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"',
+      '     fill="none" stroke="currentColor" stroke-width="1.8"',
+      '     stroke-linecap="round" stroke-linejoin="round">',
+      '  <!-- 2-4 条 path，留白要够 -->',
+      '</svg>',
+      '```',
+      '',
+      '单色描边、`currentColor`、24×24。细节多了在 24px 下会糊。',
+      '',
+      '## 七、装上前自检',
+      '',
+      '```bash',
+      'npm run build',
+      'dsh插件开发经验/scripts/check-plugin-meta.sh   你的目录',
+      'dsh插件开发经验/scripts/check-plugin-health.sh 你的目录',
+      '```',
+      '',
+      '- [ ] 中文名 2–6 字，包名 kebab-case，两者能关联',
+      '- [ ] `cordis.patch.yml` 的 `id`/`name` 都是包名',
+      '- [ ] `exports["./icon"]` 已声明',
+      '- [ ] `files` 含 `locale/*.json` 与 `icon.svg`',
+      '- [ ] `locale/zh.json` 三件套齐全，`detail` 文件存在',
+      '- [ ] `dsh.bundle.patch` 指向的文件存在',
+      '- [ ] 两个自检脚本都通过',
+    ].join('\n')
+
+    const SPEC_VISUAL = [
+      '# DSH 插件 · 视觉规范',
+      '',
+      '目标：和 DSH 自带界面**看不出接缝**，同时留一处自己的识别色。',
+      '判据不是「好看」，而是「换主题时是否跟着变、放在官方界面旁是否露异样」。',
+      '',
+      '> 所有 token 名都对照 DSH 实际样式表核对过。**照抄名字，不要猜。**',
+      '',
+      '## 一、颜色：三档分工，不是只要黑白',
+      '',
+      '规范要求「颜色从主题变量来、各司其职」，**不是「全部用灰白」**。DSH 自己的界面也大量用彩色。',
+      '',
+      '### 中性：承担结构（占 80%–90%）',
+      '',
+      '| 用途 | 变量 |',
+      '| --- | --- |',
+      '| 主文字 | `--dsw-alias-label-primary` |',
+      '| 次要文字 | `--dsw-alias-label-secondary` |',
+      '| 卡片、块表面 | `--dsw-alias-bg-layer-1` |',
+      '| 次级表面（按钮底、标签底） | `--dsw-alias-bg-layer-2` |',
+      '| 常规分隔线 | `--dsw-alias-border-l1` |',
+      '| 卡片、容器边框 | `--dsw-alias-border-l2` |',
+      '',
+      '### 交互：蓝色只有一种',
+      '',
+      '**最容易搞错的地方**：`--dsw-alias-brand-primary` **不是蓝色**。它的值是 `bluish-1000`（浅色主题近黑）或 `bluish-50`（深色主题近白），本质是「最强对比前景色」。拿它当强调色会得到一屏近黑块。',
+      '',
+      '| 用途 | 变量 | 实际值 |',
+      '| --- | --- | --- |',
+      '| 主按钮底、选中态 | `--dsw-alias-state-business-primary` | `#4176e6` |',
+      '| 浅色强调底、未选中数据 | `--dsw-alias-state-business-tertiary` | `#e4edfd` |',
+      '| 彩色填充上的文字 | `--dsw-alias-label-on-color` | `#fff` |',
+      '',
+      '彩色底上的文字**必须**用 `label-on-color`，用 `label-primary` 在深色主题下会看不清。',
+      '',
+      '### 品牌记忆点：用静态色',
+      '',
+      '- `--dsw-static-deepseek-450` = `#5686fe`',
+      '- `--dsw-static-deepseek-500` = `#4176e6`',
+      '',
+      '它们不随主题翻转，正是「记忆点」需要的。不要自造色值。',
+      '',
+      '### 状态',
+      '',
+      '| 语义 | 变量 |',
+      '| --- | --- |',
+      '| 成功、健康 | `--dsw-alias-state-success-primary` |',
+      '| 警告 | `--dsw-alias-state-warn-primary` |',
+      '| 警告文字 | `--dsw-alias-state-warn-label` |',
+      '| 错误 | `--dsw-alias-state-error-primary` |',
+      '',
+      '**已知陷阱**：`--dsw-alias-state-warning-label`、`--dsw-alias-state-danger-label`、`--dsw-alias-fill-l2` **都不存在**。写错不报错，颜色静默失效（SVG 里表现为默认黑）。',
+      '',
+      '## 二、焦点：用 outline，不是 box-shadow',
+      '',
+      '```css',
+      ':focus-visible {',
+      '  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));',
+      '  outline-offset: 2px;',
+      '}',
+      '```',
+      '',
+      '可聚焦元素必须有 `:focus-visible`。这是可用性要求——键盘用户靠它导航。',
+      '',
+      '## 三、边框：是结构，不是装饰',
+      '',
+      '面板底色和卡片底色都是 `bg-layer-1`，**只靠边框区分**。边框一淡，卡片就和背景糊在一起。',
+      '',
+      '| 场景 | 用什么 |',
+      '| --- | --- |',
+      '| 卡片、提示条、独立的块 | `1px solid var(--dsw-alias-border-l2)` |',
+      '| 区域内分隔线 | `1px solid var(--dsw-alias-border-l1)` |',
+      '| 按钮、表格、小控件 | `1px solid var(--dsw-alias-border-l1)` |',
+      '',
+      '1. 卡片边框必须用 `l2`，`l1` 在卡片上几乎看不见',
+      '2. 固定 1px 实线，不用虚线，不用 `box-shadow` 假装边框',
+      '3. 不要用透明度调淡边框，要弱化就换层级',
+      '',
+      '判断：卡片旁留一块纯背景，退后看——还能看出矩形轮廓就是对的。',
+      '',
+      '## 四、尺寸：变量 + 三个上限',
+      '',
+      '```',
+      '字号  --pl-fs-xs 11 · sm 12 · md 13 · lg 14 · title 16',
+      '间距  --pl-gap-1 4 · 2 8 · 3 12',
+      '圆角  --pl-radius-card 16 · inner 12 · chip 10 · pill 7',
+      '```',
+      '',
+      '- 一屏最多**三个字号**（11/12/13 只差 1px，用满等于没层级）',
+      '- 圆角最多**三档**',
+      '- 不写 `font-size: 13px` 这种硬编码',
+      '',
+      '**窄面板（< 420px）降一档**：卡片圆角 16→12，内边距 12→10。右侧栏就是窄面板。',
+      '',
+      '## 五、视觉重量的量化线',
+      '',
+      '一屏内：',
+      '',
+      '- 近黑实心块 **≤ 1 个**',
+      '- 高饱和彩色块 **≤ 2 个**',
+      '',
+      '超出就会「发闷」。这不是审美偏好，是密度问题。',
+      '',
+      '## 六、图标：两套尺寸',
+      '',
+      '| 场景 | 尺寸 | stroke-width |',
+      '| --- | --- | --- |',
+      '| 卡片、列表 | 24×24 | 1.8 |',
+      '| 与 11–13px 文字内联 | 16×16 | **1.2** |',
+      '',
+      '`fill="none"`、`stroke="currentColor"`、圆角线帽、只画 2–4 条线。小尺寸必须同步减细描边，否则比 24px 版本更粗。',
+      '',
+      '## 七、间距：水平统一 12px',
+      '',
+      '| 区域 | 规则 |',
+      '| --- | --- |',
+      '| 工具栏 | `padding: 12px 12px 10px` |',
+      '| 列表容器 | `padding: 12px` |',
+      '| 列表项 | `padding: 10px 12px` |',
+      '',
+      '## 八、提示：三类，生命周期不同',
+      '',
+      '| 类型 | 样式 | 消失 |',
+      '| --- | --- | --- |',
+      '| 确认 | 卡片同款 + 成功色圆点 | 3 秒 |',
+      '| 错误 | 普通说明文字 | 常驻 |',
+      '| 进行中 | 卡片同款 + 进度感 | 常驻，且带「去哪里看」的指引 |',
+      '',
+      '错误提示不能自动消失：3 秒足够错过一行错误。',
+      '',
+      '## 九、状态色：只点缀，不铺面积',
+      '',
+      '- 标签底色统一 `bg-layer-2`，只让**文字色**带状态色',
+      '- 需要淡底用 `color-mix(in srgb, <状态色> 8%, transparent)`，别超 10%',
+      '- 一屏同时出现红、黄、绿三块饱和底是典型「AI 感」',
+      '',
+      '## 十、图表：按需，不是每个插件都有',
+      '',
+      '只有时间序列、分布、可缩放区间才需要。自绘 SVG，不引图表库。',
+      '',
+      '| 元素 | 用什么 |',
+      '| --- | --- |',
+      '| 网格线 | `--dsw-alias-border-l1`，不透明度 0.5–0.9 |',
+      '| 未选中数据柱 | `--dsw-alias-state-business-tertiary`（浅蓝） |',
+      '| 选中数据柱 | `--dsw-alias-state-business-primary` |',
+      '| 选区底色 | 品牌蓝 10% |',
+      '| 刻度文字 | `--dsw-alias-label-secondary`，`--pl-fs-xs` |',
+      '| 时间数字 | 等宽字体 |',
+      '',
+      '**未选中数据不要用 `fill-l2`——它不存在**，SVG 会 fallback 成黑。',
+      '',
+      '交互至少三样：悬停读数、拖拽选区（`onDraft` 实时 / `onCommit` 落库）、「现在」竖线。',
+      '',
+      '布局：内边距 `{ left: 36, right: 12, top: 30, bottom: 24 }`，高度 196。宽度用 `ResizeObserver` 自适应。',
+      '',
+      '**参考实现**：`dsh-meeting-minutes/src/client/timeline.tsx`（673 行自包含 SVG）。抄的时候把它失效的 `NEUTRAL_BAR` 换成 `state-business-tertiary`。',
+      '',
+      '## 十一、空态：要教下一步',
+      '',
+      '- 差：「还没有纪要」',
+      '- 好：「还没有纪要。去『今日』选区间，再点时间轴下方的按钮」',
+      '',
+      '## 十二、自检',
+      '',
+      '- [ ] 没有硬编码字号、圆角、色值',
+      '- [ ] 交互蓝用 `state-business-primary`，没把 `brand-primary` 当强调色',
+      '- [ ] 彩色底上的文字是 `label-on-color`',
+      '- [ ] 可聚焦元素都有 `:focus-visible` outline',
+      '- [ ] 卡片边框是 `l2` 且未淡化',
+      '- [ ] 一屏最多三个字号、三个圆角档',
+      '- [ ] 近黑实心块 ≤ 1、高饱和彩色块 ≤ 2',
+      '- [ ] 图标 24px 用 1.8，16px 内联用 1.2',
+      '- [ ] 图表未选中数据是浅色，不是 `fill-l2`',
+      '- [ ] 成功提示会消失，错误和进行中不会',
+    ].join('\n')
+
+    const SPEC_META = [
+      '# DSH 插件 · 元信息修正',
+      '',
+      '给**已经做好的插件**用：按体检结果逐条对齐，让面板能正确显示它。',
+      '',
+      '## 先跑体检，看缺什么',
+      '',
+      '```bash',
+      'dsh插件开发经验/scripts/check-plugin-meta.sh 你的插件目录',
+      '```',
+      '',
+      '面板里每个插件卡片上也有健康度标签，点一下会复制该插件的完整报告。',
+      '',
+      '## 七项对照表',
+      '',
+      '| 要控制的 | 写在哪 | 缺了会怎样 |',
+      '| --- | --- | --- |',
+      '| 卡片名字 | `locale/zh.json` → `meta.title` | 显示包名 |',
+      '| 一句话说明 | `meta.description` | 副标题空白 |',
+      '| 详情长文 | `meta.detail` | 回落读 README |',
+      '| 图标 | `package.json` → `exports["./icon"]` | 显示默认灰方块 |',
+      '| 能否加载 | `dsh.bundle.patch` | 装了不出现 |',
+      '| 客户端服务 | `dsh.client.inject` | 运行时报 undefined |',
+      '| 打包完整 | `files` | 用户装了看不到图标和中文名 |',
+      '',
+      '## 四种常见修法',
+      '',
+      '### 1. 面板显示英文包名',
+      '',
+      '两个原因，都可能同时存在：',
+      '',
+      '**a) 缺 locale**',
+      '',
+      '```json',
+      '// locale/zh.json',
+      '{ "meta": { "title": "中文名", "description": "一句话" } }',
+      '```',
+      '',
+      '**b) `cordis.patch.yml` 的 `name` 写了相对路径**',
+      '',
+      '```yaml',
+      '# 错：宿主按相对路径找不到包根，读不到 locale',
+      '      name: ./lib/index.js',
+      '# 对：写包名',
+      '      name: dsh-my-plugin',
+      '```',
+      '',
+      '改完要重新构建并重启 DSH。',
+      '',
+      '### 2. 图标是灰方块',
+      '',
+      '```json',
+      '"exports": { "./icon": "./icon.svg" },',
+      '"files": ["icon.svg", "locale/*.json"]',
+      '```',
+      '',
+      '光有 `icon.svg` 文件但不在 `exports` 里，等于没配。图标规格：24×24、`fill="none"`、`stroke="currentColor"`、`stroke-width="1.8"`。',
+      '',
+      '### 3. 详情页空白',
+      '',
+      '- `meta.detail` 指向的文件不存在 → 创建它',
+      '- 或者干脆不写 `meta.detail`，回落读 README 也是允许的',
+      '- 写了就要保证它进了 `files`',
+      '',
+      '### 4. 中文搜不到',
+      '',
+      '`keywords` 里加中文词，至少一个：',
+      '',
+      '```json',
+      '"keywords": ["dsh", "deepseek-harness", "dsh-plugin", "插件管理"]',
+      '```',
+      '',
+      '## 只对界面插件要求的部分',
+      '',
+      '纯 host 插件（没有 `dsh.client`）不显示图标、不渲染标题，**不要求** locale 和图标。系统内置的 host 插件大多没有这些，不是缺陷。',
+      '',
+      '## 改完核对',
+      '',
+      '- [ ] 面板卡片显示中文名，不是包名',
+      '- [ ] 有图标，不是灰方块',
+      '- [ ] 详情页有内容',
+      '- [ ] 中文能搜到',
+      '- [ ] `check-plugin-meta.sh` 通过',
+      '- [ ] 重新构建 + 重启 DSH 后确认',
+    ].join('\n')
+
+    /** 三段场景规范；`id` 用于复制态的区分。 */
+    const SPEC_SECTIONS = [
+      { id: 'new', title: '新建插件', hint: '从零到能装：命名、骨架、清单、元信息、自检', text: SPEC_NEW },
+      { id: 'visual', title: '视觉设计', hint: '颜色、焦点、边框、尺寸、图标、图表', text: SPEC_VISUAL },
+      { id: 'meta', title: '元信息修正', hint: '给已做好的插件：逐条对齐，让面板正确显示', text: SPEC_META },
+    ]
+
+    const DESIGN_SPEC = SPEC_SECTIONS.map((s) => s.text).join('\n\n---\n\n')
+
     /** 把一份体检结果写成可直接交给 AI 的 Markdown。 */
     function diagnosisReport(plugin, title, diagnosis) {
       const items = (diagnosis && Array.isArray(diagnosis.items)) ? diagnosis.items : []
@@ -917,6 +1335,7 @@ window.__ModuleLoader__.load({
       const [diagnoses, setDiagnoses] = React.useState({})
       const [copiedKey, setCopiedKey] = React.useState('')
       const [toast, setToast] = React.useState('')
+      const [specTab, setSpecTab] = React.useState('new')
       const toastTimer = React.useRef(null)
       const [selectedMarket, setSelectedMarket] = React.useState(null)
       const [chartMode, setChartMode] = React.useState('cumulative')
@@ -1535,6 +1954,43 @@ window.__ModuleLoader__.load({
         searchTimer.current = setTimeout(() => runMarketSearch(value, searchSort), 300)
       }
 
+      function designView() {
+        const section = SPEC_SECTIONS.find((s) => s.id === specTab) || SPEC_SECTIONS[0]
+        return h('div', { className: 'dsh-pl-market' },
+          h('div', { className: 'dsh-pl-spec-bar' },
+            h('div', { className: 'dsh-pl-seg', role: 'tablist', 'aria-label': 'spec section' },
+              SPEC_SECTIONS.map((item) => chip(item.id, item.title, specTab, (id) => setSpecTab(id)))),
+            h('button', {
+              type: 'button',
+              className: 'dsh-pl-copy-spec',
+              onClick: () => { void copySpec(section) },
+            }, copiedKey === `spec-${section.id}` ? textOf(t, 'list.copied') : textOf(t, 'list.designCopy'))),
+          h('p', { className: 'dsh-pl-note' }, section.hint),
+          markdownView(section.text))
+      }
+
+      async function copySpec(section) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(section.text)
+          } else {
+            const area = document.createElement('textarea')
+            area.value = section.text
+            area.style.position = 'fixed'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            document.execCommand('copy')
+            document.body.removeChild(area)
+          }
+          setCopiedKey(`spec-${section.id}`)
+          showToast(textOf(t, 'list.designCopied').replace('{name}', section.title))
+          setTimeout(() => setCopiedKey(''), 2200)
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
+      }
+
       function featuredView() {
         return h('div', { className: 'dsh-pl-market' },
           h('div', { className: 'dsh-pl-featured' },
@@ -1659,10 +2115,11 @@ window.__ModuleLoader__.load({
         h('header', { className: 'dsh-pl-bar' },
           h('div', { className: 'dsh-pl-tools' },
             h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'filter' },
-              chip('installed', textOf(t, 'list.installed'), surface === 'market' || surface === 'featured' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
-              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' || surface === 'featured' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('installed', textOf(t, 'list.installed'), surface === 'market' || surface === 'featured' || surface === 'design' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' || surface === 'featured' || surface === 'design' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
               chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market')),
-              chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => setSurface('featured'))),
+              chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => setSurface('featured')),
+              chip('design', textOf(t, 'list.design'), surface === 'design' ? 'design' : '', () => setSurface('design'))),
             h('button', {
               type: 'button',
               className: 'dsh-pl-refresh',
@@ -1684,7 +2141,9 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dsh-pl-toast-dot' }),
           h('span', null, toast)) : null,
         listNote ? h('p', { className: 'dsh-pl-note dsh-pl-list-note' }, listNote) : null,
-        surface === 'featured'
+        surface === 'design'
+          ? designView()
+          : surface === 'featured'
           ? featuredView()
           : surface === 'market'
           ? selectedMarket ? marketDetail(selectedMarket) : marketView()
@@ -1813,8 +2272,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-card-btn { margin-left: 0; flex: none; position: static; }
 .dsh-pl-health { flex: none; margin-left: 0; padding: 4px 9px; border: 0; border-radius: var(--pl-radius-chip); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; white-space: nowrap; }
 .dsh-pl-health.is-ok { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); cursor: default; }
-.dsh-pl-health.is-warn { background: color-mix(in srgb, var(--dsw-alias-state-warn-label) 14%, transparent); color: var(--dsw-alias-state-warn-label); }
-.dsh-pl-health.is-bad { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent); color: var(--dsw-alias-state-error-primary); }
+.dsh-pl-health.is-warn { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-warn-label); }
+.dsh-pl-health.is-bad { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-health.is-copied { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-card-btn.is-danger { color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-list-note { margin: 10px 12px 0; }
@@ -1870,6 +2329,14 @@ window.__ModuleLoader__.load({
 .dsh-pl-stat strong { font-size: var(--pl-fs-num); font-weight: 600; line-height: 1.2; }
 .dsh-pl-chart-wrap { padding: 10px 12px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-chart { display: block; width: 100%; height: auto; }
+.dsh-pl-spec-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dsh-pl-spec-bar .dsh-pl-seg { flex: 1 1 auto; min-width: 0; }
+.dsh-pl-spec-bar .dsh-pl-copy-spec { margin-left: auto; }
+.dsh-pl-spec { padding: 14px 16px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
+.dsh-pl-spec-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.dsh-pl-spec-hint { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-copy-spec { flex: none; margin-left: auto; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-chip); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
+.dsh-pl-copy-spec:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
 .dsh-pl-block-head span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
