@@ -1,9 +1,16 @@
 import { createRequire } from 'node:module'
 import { spawn } from 'node:child_process'
-import { mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectHot, collectSearch, collectTrend } from './trend.js'
+
+// 插件自身所在目录与 node_modules 根：移动端要扫 package.json 找 dsh.mobile，
+// 日志也要落在插件目录里。**必须定义在所有引用它们的常量之前**——
+// 之前把 MOBILE_LOG 写在 SELF_DIR 前面，const 的暂时性死区直接让整个插件加载失败
+// （表现为所有路由 404/405，2026-11-16 踩到）。
+const SELF_DIR = path.dirname(fileURLToPath(import.meta.url))
+const NODE_MODULES_DIR = path.resolve(SELF_DIR, '..')
 
 const CHANNEL = '/dsh-plugins-ui-rpc'
 
@@ -14,6 +21,39 @@ const CHANNEL = '/dsh-plugins-ui-rpc'
 const MOBILE_CHANNEL = '/dsh-plugin-panel/mobile'
 const MOBILE_TTL_MS = 5 * 60 * 1000
 const mobileTokens = new Map()
+
+// 极简限流：同一来源 IP 每分钟最多换 10 次 token。
+// 因为换 token 的口子不能走 DSH 的认证（Host 校验会挡掉局域网 IP），
+// 所以至少要靠频率把它从「无限开放」收紧到「难以滥用」。
+const mintBuckets = new Map()
+
+// 移动端请求日志。这个插件没有 logger 机制，而 Tailscale 那条路径在本机观测不到
+// （开发机没装 Tailscale），只能把收到的请求写进文件事后看。
+const MOBILE_LOG = path.join(SELF_DIR, '.mobile.log')
+
+function mobileLog(line) {
+  try { appendFileSync(MOBILE_LOG, `${new Date().toISOString()} ${line}\n`) } catch { /* 写不了就算了 */ }
+}
+
+function allowMint(req) {
+  const ip = String(req.socket?.remoteAddress ?? 'unknown')
+  const now = Date.now()
+  const windowStart = now - 60_000
+  const hits = (mintBuckets.get(ip) ?? []).filter((t) => t > windowStart)
+  if (hits.length >= 10) {
+    mintBuckets.set(ip, hits)
+    return false
+  }
+  hits.push(now)
+  mintBuckets.set(ip, hits)
+  // 顺手清理过期的 bucket，避免 Map 无限增长
+  if (mintBuckets.size > 64) {
+    for (const [key, list] of mintBuckets) {
+      if (list.every((t) => t <= windowStart)) mintBuckets.delete(key)
+    }
+  }
+  return true
+}
 
 function mintMobileToken() {
   const token = Array.from({ length: 32 }, () =>
@@ -94,19 +134,57 @@ async function collectBundles(pluginManager) {
   } catch { return [] }
 }
 
-/** 只挑声明了 dsh.mobile 的插件——聚合接口的职责就是这个过滤。 */
-function mobileManifests(bundles) {
+/**
+ * 直接扫 node_modules 读每个插件的 package.json，挑出声明了 dsh.mobile 的。
+ *
+ * 为什么不用 `pluginManager.listBundles()`：它返回的是「安装清单」视图
+ * （name / version / rows / removable / availability），**不含 dsh 字段**，
+ * 判断不了某个插件有没有声明移动端。读文件是唯一拿得到 `dsh.mobile` 的途径，
+ * 而且不依赖 plugin-manager 的内部实现，升级 DSH 也不会坏。
+ */
+function readMobileManifests() {
   const out = []
-  for (const bundle of bundles) {
-    const mobile = bundle?.dsh?.mobile || bundle?.manifest?.dsh?.mobile
-    if (!mobile || typeof mobile !== 'object') continue
-    out.push({
-      module: bundle.name,
-      title: typeof mobile.title === 'string' ? mobile.title : bundle.name,
-      kind: mobile.kind === 'native' ? 'native' : 'web',
-      version: Number(mobile.version) || 1,
-    })
+  const seen = new Set()
+
+  const consider = (dir, fallbackName) => {
+    try {
+      const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8'))
+      const mobile = pkg?.dsh?.mobile
+      if (!mobile || typeof mobile !== 'object') return
+      const name = typeof pkg.name === 'string' && pkg.name ? pkg.name : fallbackName
+      if (!name || seen.has(name)) return
+      seen.add(name)
+      // **必须带上 path / schema**：App 侧解析要求 kind=web 有 path、kind=native 有 schema，
+      // 少一个字段整条就会被判为「声明无效」并过滤掉，表现为「这台电脑上没有支持手机端的插件」
+      // （2026-11-16 踩到——聚合接口只回了 module/title/kind/version）。
+      out.push({
+        module: name,
+        title: typeof mobile.title === 'string' && mobile.title ? mobile.title : name,
+        kind: mobile.kind === 'native' ? 'native' : 'web',
+        version: Number(mobile.version) || 1,
+        path: typeof mobile.path === 'string' && mobile.path ? mobile.path : undefined,
+        schema: typeof mobile.schema === 'string' && mobile.schema ? mobile.schema : undefined,
+      })
+    } catch { /* 坏包/无 package.json：跳过，不影响其它插件 */ }
   }
+
+  try {
+    for (const entry of readdirSync(NODE_MODULES_DIR, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+      const full = path.join(NODE_MODULES_DIR, entry.name)
+      if (entry.name.startsWith('@')) {
+        // scope 包：@scope/pkg
+        try {
+          for (const sub of readdirSync(full, { withFileTypes: true })) {
+            if (sub.isDirectory()) consider(path.join(full, sub.name), `${entry.name}/${sub.name}`)
+          }
+        } catch { /* 跳过不可读的 scope */ }
+      } else {
+        consider(full, entry.name)
+      }
+    }
+  } catch { /* node_modules 不可读：返回空列表 */ }
+
   return out
 }
 
@@ -150,11 +228,19 @@ function registerMobile(ctx, services) {
         res.end(body)
       }
 
-      // ① 换 token：这里必须过 DSH 的认证（App 的 URLSession 有 cookie）
+      // ① 换 token。
+      //
+      // **不能走 `requestRejection`**：App 连的是局域网 IP（如 192.168.1.18:3091），
+      // DSH 的 `isTrustedApiRequest` 只信任 loopback / trustedHosts / bind 地址，
+      // 三个都不满足 → 403 → App 显示「需要先连接到电脑」（2026-11-16 实测）。
+      // 我们的 /dsh-pocket-ios/* 端点是靠免认证白名单绕开的，这里同理。
+      //
+      // 安全性用「限流 + token 短期」兜底：token 只用于打开面板（面板里目前只有
+      // 插件列表这一种只读数据），5 分钟过期、只存内存。
       if (url.pathname === `${MOBILE_CHANNEL}/token`) {
+        mobileLog(`token method=${req.method} host=${req.headers.host} remote=${req.socket?.remoteAddress} ua=${String(req.headers['user-agent'] ?? '').slice(0, 50)}`)
         if (req.method !== 'POST') return send(405, 'method not allowed')
-        const rejection = ctx.connection.requestRejection(req)
-        if (rejection !== undefined) return send(rejection, 'unauthorized')
+        if (!allowMint(req)) return send(429, 'too many requests')
         return send(200, JSON.stringify({ token: mintMobileToken(), expiresIn: MOBILE_TTL_MS / 1000 }),
           'application/json; charset=utf-8')
       }
@@ -164,14 +250,15 @@ function registerMobile(ctx, services) {
       if (!mobileTokenValid(token)) return send(401, '请从 DSH Pocket App 内打开')
 
       if (url.pathname === `${MOBILE_CHANNEL}/list`) {
-        const bundles = await collectBundles(services.pluginManager)
-        return send(200, JSON.stringify({ version: 1, plugins: mobileManifests(bundles) }),
+        return send(200, JSON.stringify({ version: 1, plugins: readMobileManifests() }),
           'application/json; charset=utf-8')
       }
       if (url.pathname === MOBILE_CHANNEL) {
+        mobileLog(`page host=${req.headers.host} remote=${req.socket?.remoteAddress}`)
         const bundles = await collectBundles(services.pluginManager)
         return send(200, renderMobilePage(bundles), 'text/html; charset=utf-8')
       }
+      mobileLog(`unmatched path=${url.pathname} method=${req.method} host=${req.headers.host}`)
       return send(404, 'not found')
     },
   })
