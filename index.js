@@ -235,6 +235,41 @@ function mobileDeclarationProblems(mobile) {
   return problems
 }
 
+/**
+ * 所有插件的移动端入口表：{ 包名: path }。
+ * 不带 dsh.mobile 的插件也能查到——列表里要点它时才知道该打开哪。
+ */
+function mobilePaths() {
+  const map = new Map()
+  const push = (dir, fallbackName) => {
+    try {
+      const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8'))
+      const mobile = pkg?.dsh?.mobile
+      if (!mobile || typeof mobile !== 'object') return
+      const name = typeof pkg.name === 'string' && pkg.name ? pkg.name : fallbackName
+      if (!name) return
+      if (typeof mobile.path === 'string' && mobile.path) map.set(name, mobile.path)
+    } catch { /* 跳过坏包 */ }
+  }
+  try {
+    for (const entry of readdirSync(NODE_MODULES_DIR, { withFileTypes: true })) {
+      const dirLike = entry.isDirectory() || entry.isSymbolicLink()
+      if (!dirLike || entry.name.startsWith('.')) continue
+      const full = path.join(NODE_MODULES_DIR, entry.name)
+      if (entry.name.startsWith('@')) {
+        try {
+          for (const sub of readdirSync(full, { withFileTypes: true })) {
+            if (sub.isDirectory() || sub.isSymbolicLink()) push(path.join(full, sub.name), `${entry.name}/${sub.name}`)
+          }
+        } catch { /* 跳过 */ }
+      } else {
+        push(full, entry.name)
+      }
+    }
+  } catch { /* 跳过 */ }
+  return map
+}
+
 function readMobileManifests() {
   const plugins = []
   const invalid = []
@@ -298,6 +333,7 @@ function readIfExists(file, fallback) {
 }
 
 function renderMobilePage(bundles, token) {
+  const paths = mobilePaths()
   const items = bundles.map((bundle) => {
     const moduleName = String(bundle.name ?? '')
     const name = escapeHtml(moduleName)
@@ -305,6 +341,11 @@ function renderMobilePage(bundles, token) {
     const { description, detail } = readBundleTexts(moduleName)
     const repo = typeof bundle.repo === 'string' ? bundle.repo : ''
     const inline = description ? `<span class="desc">${escapeHtml(description)}</span>` : ''
+    // 这个插件有没有移动端页面；有就给它一个「打开」入口，没有就不显示按钮
+    const mobilePath = paths.get(moduleName)
+    const mobileLink = mobilePath
+      ? `${escapeHtml(mobilePath)}${mobilePath.includes('?') ? '&' : '?'}mt=${encodeURIComponent(token ?? '')}`
+      : ''
     // item 模板也在文件里：改列表结构不用重启
     const itemTemplate = readIfExists(
       path.join(SELF_DIR, 'mobile', 'item.html'),
@@ -319,6 +360,7 @@ function renderMobilePage(bundles, token) {
         + (detail ? `<p>${escapeHtml(detail)}</p>` : '')
         + (!detail && !description ? '<p>这个插件没有写简介也没有 README。</p>' : '')
         + (repo ? `<a href="${escapeHtml(repo)}" target="_blank" rel="noreferrer">打开仓库</a>` : '')
+        + (mobileLink ? `<a class="open" href="${mobileLink}">打开</a>` : '')
         + `</div>`)
   }).join('\n')
 
