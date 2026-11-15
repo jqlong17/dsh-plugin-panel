@@ -39,6 +39,12 @@
         "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-client-locale"
       ]
+    },
+    "mobile": {
+      "version": 1,
+      "kind": "web",
+      "title": "插件",
+      "path": "/dsh-plugin-panel/mobile"
     }
   },
   "engines": {

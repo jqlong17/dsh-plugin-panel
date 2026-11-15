@@ -6,6 +6,33 @@ import { fileURLToPath } from 'node:url'
 import { collectHot, collectSearch, collectTrend } from './trend.js'
 
 const CHANNEL = '/dsh-plugins-ui-rpc'
+
+// ── 移动端（P2）─────────────────────────────────────────────
+// 服务器上没有任何图形界面可以确认身份，App 也没法把 cookie 注入 WKWebView，
+// 所以用一个「一次性 token」：App 用自己的 cookie 换一个 5 分钟有效的短令牌，
+// 再把令牌拼进 WebView 的 URL。token 只存内存，用完/过期即弃。
+const MOBILE_CHANNEL = '/dsh-plugin-panel/mobile'
+const MOBILE_TTL_MS = 5 * 60 * 1000
+const mobileTokens = new Map()
+
+function mintMobileToken() {
+  const token = Array.from({ length: 32 }, () =>
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+      [Math.floor(Math.random() * 64)]).join('')
+  mobileTokens.set(token, Date.now() + MOBILE_TTL_MS)
+  // 顺手清掉过期的，避免 Map 无限增长
+  const now = Date.now()
+  for (const [k, exp] of mobileTokens) if (exp < now) mobileTokens.delete(k)
+  return token
+}
+
+function mobileTokenValid(token) {
+  if (typeof token !== 'string' || token.length !== 32) return false
+  const exp = mobileTokens.get(token)
+  if (exp === undefined) return false
+  if (exp < Date.now()) { mobileTokens.delete(token); return false }
+  return true
+}
 const MAX_SOURCE_BYTES = 1_200_000
 const MAX_FILES = 40
 const MAX_DOC_CHARS = 2400
@@ -17,6 +44,136 @@ export function apply(ctx) {
     const tools = scoped.tools
     const pluginManager = scoped.pluginManager
     scoped.effect(() => registerDetailRpc(scoped, { tools, pluginManager }), 'plugin-canvas: detail rpc')
+    // 移动端：一次性 token + 移动版页面 + 聚合接口
+    scoped.effect(() => registerMobile(scoped, { pluginManager }), 'plugin-canvas: mobile routes')
+  })
+}
+
+// ── 移动端路由 ────────────────────────────────────────────────
+// 三条路径：
+//   POST /dsh-plugin-panel/mobile/token        用 cookie 换一次性 token
+//   GET  /dsh-plugin-panel/mobile?mt=<token>   移动版页面（HTML，数据服务端直出）
+//   GET  /dsh-plugin-panel/mobile/list?mt=     聚合接口（哪些插件声明了 dsh.mobile）
+//
+// 为什么移动页面用服务端直出而不是前端 fetch：
+// WKWebView 拿不到 App 的 cookie，页面里的 fetch 会被 requestRejection 挡住。
+// 直出可以完全避开这个问题，页面里不需要任何跨域请求。
+const MOBILE_PAGE_CSS = `
+:root{--bg:#fff;--fg:#1c1c1e;--fg2:#6b7280;--line:#e5e7eb;--accent:#147a5e;--card:#f7f8f9}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#f2f2f7;--fg2:#8e8e93;--line:#2c2c2e;--card:#1c1c1e}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:.5px solid var(--line);padding:14px 16px;display:flex;align-items:baseline;gap:8px}
+header h1{margin:0;font-size:17px;font-weight:600}
+header .count{color:var(--fg2);font-size:13px}
+main{padding:8px 12px 24px}
+.item{background:var(--card);border-radius:12px;margin:8px 0;overflow:hidden}
+.item summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;min-height:44px}
+.item summary::-webkit-details-marker{display:none}
+.item .name{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .ver{color:var(--fg2);font-size:12px;font-variant-numeric:tabular-nums}
+.item[open] summary{border-bottom:.5px solid var(--line)}
+.detail{padding:12px 16px 16px;color:var(--fg2);font-size:13px}
+.detail p{margin:0 0 8px}
+.detail a{color:var(--accent);text-decoration:none}
+.empty{padding:48px 24px;text-align:center;color:var(--fg2)}
+.note{margin:16px 12px 0;padding:12px;border-radius:10px;background:var(--card);color:var(--fg2);font-size:12px}
+`
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
+}
+
+async function collectBundles(pluginManager) {
+  if (!pluginManager || typeof pluginManager.listBundles !== 'function') return []
+  try {
+    const bundles = await pluginManager.listBundles()
+    return Array.isArray(bundles) ? bundles : []
+  } catch { return [] }
+}
+
+/** 只挑声明了 dsh.mobile 的插件——聚合接口的职责就是这个过滤。 */
+function mobileManifests(bundles) {
+  const out = []
+  for (const bundle of bundles) {
+    const mobile = bundle?.dsh?.mobile || bundle?.manifest?.dsh?.mobile
+    if (!mobile || typeof mobile !== 'object') continue
+    out.push({
+      module: bundle.name,
+      title: typeof mobile.title === 'string' ? mobile.title : bundle.name,
+      kind: mobile.kind === 'native' ? 'native' : 'web',
+      version: Number(mobile.version) || 1,
+    })
+  }
+  return out
+}
+
+function renderMobilePage(bundles) {
+  const rows = bundles.map((bundle) => {
+    const name = escapeHtml(bundle.name)
+    const version = escapeHtml(bundle.version ?? '')
+    const summary = escapeHtml(bundle.rows?.[0]?.summary ?? '')
+    const repo = typeof bundle.repo === 'string' ? bundle.repo : ''
+    const removable = bundle.removable === false ? '' : ''
+    return `<details class="item">`
+      + `<summary><span class="name">${name}</span>`
+      + `<span class="ver">${version}</span></summary>`
+      + `<div class="detail">`
+      + (summary ? `<p>${summary}</p>` : '<p>（这个插件没有写简介）</p>')
+      + (repo ? `<a href="${escapeHtml(repo)}" target="_blank" rel="noreferrer">打开仓库</a>` : '')
+      + removable
+      + `</div></details>`
+  }).join('\n')
+
+  return `<!doctype html>
+<html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>插件</title><style>${MOBILE_PAGE_CSS}</style>
+</head><body>
+<header><h1>插件</h1><span class="count">${bundles.length}</span></header>
+<main>${rows || '<p class="empty">还没有安装任何插件</p>'}</main>
+<p class="note">这是插件的移动版页面（P2 验证版）。桌面端的完整管理在右侧栏。</p>
+</body></html>`
+}
+
+function registerMobile(ctx, services) {
+  return ctx.webServer.register({
+    kind: 'prefix',
+    path: MOBILE_CHANNEL,
+    handler: async (req, res) => {
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      const send = (status, body, type = 'text/plain; charset=utf-8') => {
+        res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' })
+        res.end(body)
+      }
+
+      // ① 换 token：这里必须过 DSH 的认证（App 的 URLSession 有 cookie）
+      if (url.pathname === `${MOBILE_CHANNEL}/token`) {
+        if (req.method !== 'POST') return send(405, 'method not allowed')
+        const rejection = ctx.connection.requestRejection(req)
+        if (rejection !== undefined) return send(rejection, 'unauthorized')
+        return send(200, JSON.stringify({ token: mintMobileToken(), expiresIn: MOBILE_TTL_MS / 1000 }),
+          'application/json; charset=utf-8')
+      }
+
+      // ② 其余两条都要一次性 token（WebView 带不上 cookie）
+      const token = url.searchParams.get('mt')
+      if (!mobileTokenValid(token)) return send(401, '请从 DSH Pocket App 内打开')
+
+      if (url.pathname === `${MOBILE_CHANNEL}/list`) {
+        const bundles = await collectBundles(services.pluginManager)
+        return send(200, JSON.stringify({ version: 1, plugins: mobileManifests(bundles) }),
+          'application/json; charset=utf-8')
+      }
+      if (url.pathname === MOBILE_CHANNEL) {
+        const bundles = await collectBundles(services.pluginManager)
+        return send(200, renderMobilePage(bundles), 'text/html; charset=utf-8')
+      }
+      return send(404, 'not found')
+    },
   })
 }
 
