@@ -99,29 +99,6 @@ export function apply(ctx) {
 // 为什么移动页面用服务端直出而不是前端 fetch：
 // WKWebView 拿不到 App 的 cookie，页面里的 fetch 会被 requestRejection 挡住。
 // 直出可以完全避开这个问题，页面里不需要任何跨域请求。
-const MOBILE_PAGE_CSS = `
-:root{--bg:#fff;--fg:#1c1c1e;--fg2:#6b7280;--line:#e5e7eb;--accent:#147a5e;--card:#f7f8f9}
-@media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#f2f2f7;--fg2:#8e8e93;--line:#2c2c2e;--card:#1c1c1e}}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:.5px solid var(--line);padding:14px 16px;display:flex;align-items:baseline;gap:8px}
-header h1{margin:0;font-size:17px;font-weight:600}
-header .count{color:var(--fg2);font-size:13px}
-main{padding:8px 12px 24px}
-.item{background:var(--card);border-radius:12px;margin:8px 0;overflow:hidden}
-.item summary{list-style:none;cursor:pointer;padding:14px 16px 6px;display:flex;align-items:center;gap:10px;min-height:44px}
-.item summary::-webkit-details-marker{display:none}
-.item .name{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item .ver{color:var(--fg2);font-size:12px;font-variant-numeric:tabular-nums}
-.item[open] summary{border-bottom:.5px solid var(--line)}
-.inline{padding:0 16px 12px;color:var(--fg2);font-size:13px;line-height:1.45}
-.detail{padding:12px 16px 16px;color:var(--fg2);font-size:13px}
-.detail p{margin:0 0 8px}
-.detail a{color:var(--accent);text-decoration:none}
-.empty{padding:48px 24px;text-align:center;color:var(--fg2)}
-.note{margin:16px 12px 0;padding:12px;border-radius:10px;background:var(--card);color:var(--fg2);font-size:12px}
-`
-
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -233,8 +210,34 @@ async function collectBundles(pluginManager) {
  * 判断不了某个插件有没有声明移动端。读文件是唯一拿得到 `dsh.mobile` 的途径，
  * 而且不依赖 plugin-manager 的内部实现，升级 DSH 也不会坏。
  */
+/**
+ * 按 App 侧同一套规则校验声明，返回问题列表。
+ *
+ * 规则必须和 `dsh-pocket-ios` 的 PluginMobileManifest.parse 保持一致：
+ * 那边任一必填项缺失就判 unsupported 并过滤整条。
+ * bin/check.js 里有同样的规则（供开发者本地跑），改动时三处一起改。
+ */
+function mobileDeclarationProblems(mobile) {
+  const problems = []
+  const version = Number(mobile.version)
+  if (!Number.isFinite(version)) problems.push('缺少 version')
+  else if (version > 1) problems.push(`version=${version} 高于 App 支持的 1`)
+  const kind = typeof mobile.kind === 'string' ? mobile.kind.trim() : ''
+  if (kind !== 'web' && kind !== 'native') problems.push('kind 必须是 web 或 native')
+  const title = typeof mobile.title === 'string' ? mobile.title.trim() : ''
+  if (title === '') problems.push('缺少 title')
+  if (kind === 'web' && (typeof mobile.path !== 'string' || mobile.path.trim() === '')) {
+    problems.push('kind=web 但没有 path')
+  }
+  if (kind === 'native' && (typeof mobile.schema !== 'string' || mobile.schema.trim() === '')) {
+    problems.push('kind=native 但没有 schema')
+  }
+  return problems
+}
+
 function readMobileManifests() {
-  const out = []
+  const plugins = []
+  const invalid = []
   const seen = new Set()
 
   const consider = (dir, fallbackName) => {
@@ -245,10 +248,17 @@ function readMobileManifests() {
       const name = typeof pkg.name === 'string' && pkg.name ? pkg.name : fallbackName
       if (!name || seen.has(name)) return
       seen.add(name)
+      // 声明有问题时**记下来而不是丢掉**：静默过滤会让 App 显示「没有插件」，
+      // 让人以为是没装，实际只是少个字段（2026-11-16 因此浪费半小时）。
+      const problems = mobileDeclarationProblems(mobile)
+      if (problems.length > 0) {
+        invalid.push({ module: name, problems })
+        return
+      }
       // **必须带上 path / schema**：App 侧解析要求 kind=web 有 path、kind=native 有 schema，
       // 少一个字段整条就会被判为「声明无效」并过滤掉，表现为「这台电脑上没有支持手机端的插件」
       // （2026-11-16 踩到——聚合接口只回了 module/title/kind/version）。
-      out.push({
+      plugins.push({
         module: name,
         title: typeof mobile.title === 'string' && mobile.title ? mobile.title : name,
         kind: mobile.kind === 'native' ? 'native' : 'web',
@@ -276,17 +286,24 @@ function readMobileManifests() {
     }
   } catch { /* node_modules 不可读：返回空列表 */ }
 
-  return out
+  return { plugins, invalid }
 }
 
-function renderMobilePage(bundles) {
-  const rows = bundles.map((bundle) => {
+const MOBILE_PAGE_PATH = path.join(SELF_DIR, 'mobile', 'page.html')
+const MOBILE_STYLE_PATH = path.join(SELF_DIR, 'mobile', 'style.css')
+
+/** 每次请求都重读模板和样式——改文案/配色不需要重启 DSH。 */
+function readIfExists(file, fallback) {
+  try { return readFileSync(file, 'utf8') } catch { return fallback }
+}
+
+function renderMobilePage(bundles, token) {
+  const items = bundles.map((bundle) => {
     const moduleName = String(bundle.name ?? '')
     const name = escapeHtml(moduleName)
     const version = escapeHtml(bundle.version ?? '')
     const { description, detail } = readBundleTexts(moduleName)
     const repo = typeof bundle.repo === 'string' ? bundle.repo : ''
-    // 列表行直接带一句话简介，不用展开就能看出这个插件是干什么的
     const inline = description ? `<span class="desc">${escapeHtml(description)}</span>` : ''
     return `<details class="item">`
       + `<summary><span class="name">${name}</span>`
@@ -299,16 +316,16 @@ function renderMobilePage(bundles) {
       + `</div></details>`
   }).join('\n')
 
-  return `<!doctype html>
-<html lang="zh"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>插件</title><style>${MOBILE_PAGE_CSS}</style>
-</head><body>
-<header><h1>插件</h1><span class="count">${bundles.length}</span></header>
-<main>${rows || '<p class="empty">还没有安装任何插件</p>'}</main>
-<p class="note">这是插件的移动版页面（P2 验证版）。桌面端的完整管理在右侧栏。</p>
-</body></html>`
+  const template = readIfExists(
+    MOBILE_PAGE_PATH,
+    '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><main>{{ITEMS}}</main></body></html>',
+  )
+  return template
+    .replaceAll('{{TITLE}}', escapeHtml('插件'))
+    .replaceAll('{{COUNT}}', String(bundles.length))
+    .replaceAll('{{ITEMS}}', items || '<p class="empty">还没有安装任何插件</p>')
+    .replaceAll('{{NOTE}}', '这是插件的移动版页面。桌面端的完整管理在右侧栏；标题、文案和配色改了之后刷新即可，不用重启。')
+    .replaceAll('{{TOKEN}}', escapeHtml(token ?? ''))
 }
 
 function registerMobile(ctx, services) {
@@ -344,13 +361,20 @@ function registerMobile(ctx, services) {
       if (!mobileTokenValid(token)) return send(401, '请从 DSH Pocket App 内打开')
 
       if (url.pathname === `${MOBILE_CHANNEL}/list`) {
-        return send(200, JSON.stringify({ version: 1, plugins: readMobileManifests() }),
+        const { plugins, invalid } = readMobileManifests()
+        // invalid 让 App 能显示「这个插件的移动端声明不完整」，而不是当成没装
+        return send(200, JSON.stringify({ version: 1, plugins, invalid }),
           'application/json; charset=utf-8')
       }
       if (url.pathname === MOBILE_CHANNEL) {
         mobileLog(`page host=${req.headers.host} remote=${req.socket?.remoteAddress}`)
         const bundles = await collectBundles(services.pluginManager)
-        return send(200, renderMobilePage(bundles), 'text/html; charset=utf-8')
+        return send(200, renderMobilePage(bundles, token), 'text/html; charset=utf-8')
+      }
+      // 样式独立成一个文件：调字号配色改 mobile/style.css 再刷新即可，不用重启
+      if (url.pathname === `${MOBILE_CHANNEL}/style.css`) {
+        return send(200, readIfExists(MOBILE_STYLE_PATH, 'body{font:15px system-ui;padding:16px}'),
+          'text/css; charset=utf-8')
       }
       mobileLog(`unmatched path=${url.pathname} method=${req.method} host=${req.headers.host}`)
       return send(404, 'not found')

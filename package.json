@@ -10,6 +10,7 @@
     "./icon": "./icon.svg"
   },
   "files": [
+    "bin",
     "index.js",
     "trend.js",
     "client.js",
@@ -70,5 +71,8 @@
   "homepage": "https://github.com/jqlong17/dsh-plugin-panel#readme",
   "bugs": {
     "url": "https://github.com/jqlong17/dsh-plugins-ui/issues"
+  },
+  "bin": {
+    "dsh-plugin-panel": "bin/check.js"
   }
 }
