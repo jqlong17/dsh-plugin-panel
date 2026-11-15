@@ -60,8 +60,8 @@
         "zh": "DSH Pocket iOS"
       },
       "description": {
-        "en": "Adds a native \"Phone access (iOS)\" settings page with four switchable connection methods: LAN, Cloudflare (zero install on the phone), Tailscale (fixed address), and EasyTier (self-hosted mesh via SOCKS5). Scan a QR to sign in — no password needed, and rebuilds no longer require re-scanning.",
-        "zh": "在 DSH 设置页新增原生「手机访问（iOS）」：局域网 / Cloudflare / Tailscale / EasyTier 四种连接方式可随时切换。扫码即连、无需密码；重新安装后也不用重新扫码。Cloudflare 与局域网手机端零安装。"
+        "en": "Adds a native \"Phone access (iOS)\" settings page with four switchable methods: LAN, Cloudflare (zero install on the phone), Tailscale (fixed address), and EasyTier. Scan to sign in — no password, and rebuilds no longer require rescanning. Ships a CLI (pair / status / mode / doctor) for servers without a GUI.",
+        "zh": "在 DSH 设置页新增原生「手机访问（iOS）」：局域网 / Cloudflare / Tailscale / EasyTier 四种方式可随时切换。扫码即连、无需密码；重装后也不必重新扫码。附带 CLI（pair / status / mode / doctor），无图形界面的服务器可在终端出码。"
       },
       "icon": "https://raw.githubusercontent.com/jqlong17/dsh-plugins-ui/main/dsh-pocket-ios-icon.png",
       "author": "jqlong17",
@@ -80,6 +80,16 @@
         {
           "version": "0.5.0",
           "publishTimestamp": 1794703236,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        },
+        {
+          "version": "0.6.0",
+          "publishTimestamp": 1794710117,
           "source": {
             "type": "npm"
           },
