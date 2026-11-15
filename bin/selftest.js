@@ -94,6 +94,11 @@ async function main() {
     // 未替换的模板变量说明渲染有 bug
     const leftover = html.match(/\{\{[A-Z]+\}\}/g) ?? []
     record('模板变量全替换', leftover.length === 0, leftover.length ? leftover.join(',') : '无残留')
+    // 「模板里该有的占位符」是另一种错：替换了但模板没放，页面静默少一块 UI
+    // （2026-11-16 踩到：{{TOGGLE}} 没有落进 item.html，48 个开关按钮全部不渲染）
+    const toggleCount = (html.match(/class="toggle"/g) ?? []).length
+    const itemsCount = (html.match(/class="item"/g) ?? []).length
+    record('开关按钮渲染', toggleCount === itemsCount, `${toggleCount}/${itemsCount}`)
   } catch (error) {
     record('page', false, error.message)
   }
