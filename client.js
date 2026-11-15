@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.7'
+    const VERSION = 'v0.1.8'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
@@ -916,6 +916,8 @@ window.__ModuleLoader__.load({
       const [listNote, setListNote] = React.useState('')
       const [diagnoses, setDiagnoses] = React.useState({})
       const [copiedKey, setCopiedKey] = React.useState('')
+      const [toast, setToast] = React.useState('')
+      const toastTimer = React.useRef(null)
       const [selectedMarket, setSelectedMarket] = React.useState(null)
       const [chartMode, setChartMode] = React.useState('cumulative')
       const [hotQuery, setHotQuery] = React.useState('')
@@ -988,6 +990,10 @@ window.__ModuleLoader__.load({
           setStatus((current) => (current === 'ready' ? 'ready' : 'error'))
         }
       }, [listPlugins, listBundles, props.diagnosePlugins, t])
+
+      React.useEffect(() => () => {
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+      }, [])
 
       React.useEffect(() => { void load() }, [load])
       React.useEffect(() => {
@@ -1316,6 +1322,13 @@ window.__ModuleLoader__.load({
         })
       }
 
+      /** 顶部提示条：3 秒后自动消失，新提示顶掉旧的。 */
+      function showToast(message) {
+        setToast(message)
+        if (toastTimer.current) clearTimeout(toastTimer.current)
+        toastTimer.current = setTimeout(() => setToast(''), 3000)
+      }
+
       async function copyDiagnosis(plugin, title, diagnosis) {
         const text = diagnosisReport(plugin, title, diagnosis)
         try {
@@ -1332,7 +1345,7 @@ window.__ModuleLoader__.load({
             document.body.removeChild(area)
           }
           setCopiedKey(plugin.entryId)
-          setListNote(textOf(t, 'list.copiedHint'))
+          showToast(textOf(t, 'list.copiedHint'))
           setTimeout(() => setCopiedKey(''), 2200)
         } catch (failure) {
           setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
@@ -1667,6 +1680,9 @@ window.__ModuleLoader__.load({
               chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
               chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) })),
             h('span', { className: 'dsh-pl-version' }, VERSION))),
+        toast ? h('div', { className: 'dsh-pl-toast', role: 'status' },
+          h('span', { className: 'dsh-pl-toast-dot' }),
+          h('span', null, toast)) : null,
         listNote ? h('p', { className: 'dsh-pl-note dsh-pl-list-note' }, listNote) : null,
         surface === 'featured'
           ? featuredView()
@@ -1801,7 +1817,10 @@ window.__ModuleLoader__.load({
 .dsh-pl-health.is-bad { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent); color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-health.is-copied { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-card-btn.is-danger { color: var(--dsw-alias-state-error-primary); }
-.dsh-pl-list-note { margin: 0 12px 8px; }
+.dsh-pl-list-note { margin: 10px 12px 0; }
+.dsh-pl-toast { display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-sm); line-height: 1.5; animation: dsh-pl-toast-in 160ms ease-out; }
+.dsh-pl-toast-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-state-success-primary); }
+@keyframes dsh-pl-toast-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 .dsh-pl-item.is-pinned { background: color-mix(in srgb, var(--dsw-alias-label-primary) 7%, var(--dsw-alias-bg-layer-1)); }
 .dsh-pl-item img, .dsh-pl-fallback { width: 22px; height: 22px; border-radius: var(--pl-radius-pill); object-fit: cover; flex: none; }
 .dsh-pl-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
