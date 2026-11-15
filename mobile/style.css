@@ -20,3 +20,6 @@ main{padding:8px 12px 24px}
 .note{margin:16px 12px 0;padding:12px;border-radius:10px;background:var(--card);color:var(--fg2);font-size:12px}
 
 .detail a.open{display:inline-block;margin-left:14px;padding:6px 14px;border-radius:999px;background:var(--accent);color:#fff;text-decoration:none;font-size:13px}
+
+.toggle{margin-left:10px;padding:4px 12px;border-radius:999px;border:.5px solid var(--line);background:transparent;color:var(--fg2);font-size:12px}
+.toggle:disabled{opacity:.5}

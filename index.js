@@ -270,6 +270,30 @@ function mobilePaths() {
   return map
 }
 
+/**
+ * 运行时插件状态：{ 包名 -> { entryId, enabled } }。
+ *
+ * `listBundles()` 只有安装清单（name/version/rows），**没有 enabled 和 entryId**；
+ * 那两样在 `listPlugins()` 里（client.js 用的就是 plugin.enabled / plugin.entryId）。
+ * 移动页面同时需要「列表信息」和「开关状态」，所以两边都读、按包名合并。
+ */
+async function readPluginStates(pluginManager) {
+  const states = new Map()
+  if (!pluginManager || typeof pluginManager.listPlugins !== 'function') return states
+  try {
+    const plugins = await pluginManager.listPlugins()
+    for (const plugin of Array.isArray(plugins) ? plugins : []) {
+      const name = plugin?.moduleName || plugin?.name
+      if (typeof name !== 'string' || !name) continue
+      states.set(name, {
+        entryId: typeof plugin.entryId === 'string' ? plugin.entryId : '',
+        enabled: plugin.enabled !== false,
+      })
+    }
+  } catch { /* 读不到就当作全部启用 */ }
+  return states
+}
+
 function readMobileManifests() {
   const plugins = []
   const invalid = []
@@ -332,7 +356,7 @@ function readIfExists(file, fallback) {
   try { return readFileSync(file, 'utf8') } catch { return fallback }
 }
 
-function renderMobilePage(bundles, token) {
+function renderMobilePage(bundles, token, states = new Map()) {
   const paths = mobilePaths()
   const items = bundles.map((bundle) => {
     const moduleName = String(bundle.name ?? '')
@@ -356,6 +380,13 @@ function renderMobilePage(bundles, token) {
       .replaceAll('{{NAME}}', name)
       .replaceAll('{{VERSION}}', version)
       .replaceAll('{{INLINE}}', inline ? `<div class="inline">${inline}</div>` : '')
+      .replaceAll('{{TOGGLE}}', (() => {
+        const state = states.get(moduleName)
+        const enabled = state ? state.enabled : true
+        return `<button class="toggle" data-name="${escapeHtml(moduleName)}"`
+          + ` data-enabled="${enabled ? 'true' : 'false'}">`
+          + `${enabled ? '关闭' : '开启'}</button>`
+      })())
       .replaceAll('{{DETAIL}}', `<div class="detail">`
         + (detail ? `<p>${escapeHtml(detail)}</p>` : '')
         + (!detail && !description ? '<p>这个插件没有写简介也没有 README。</p>' : '')
@@ -373,8 +404,72 @@ function renderMobilePage(bundles, token) {
     .replaceAll('{{COUNT}}', String(bundles.length))
     .replaceAll('{{ITEMS}}', items || '<p class="empty">还没有安装任何插件</p>')
     .replaceAll('{{NOTE}}', '这是插件的移动版页面。桌面端的完整管理在右侧栏；标题、文案和配色改了之后刷新即可，不用重启。')
+    .replaceAll('{{TOGGLE_SCRIPT}}', TOGGLE_SCRIPT)
     .replaceAll('{{TOKEN}}', escapeHtml(token ?? ''))
+    .replaceAll('{{TOKEN_JSON}}', JSON.stringify(String(token ?? '')))
 }
+
+/** 从 listBundles 里找出插件的 entryId（enable/disable 需要它，不是包名）。 */
+function resolveEntryId(bundles, name) {
+  for (const bundle of bundles) {
+    if (bundle.name !== name) continue
+    if (typeof bundle.entryId === 'string' && bundle.entryId) return bundle.entryId
+    for (const row of Array.isArray(bundle.rows) ? bundle.rows : []) {
+      if (typeof row.entryId === 'string' && row.entryId
+        && (row.moduleName === name || row.name === name)) return row.entryId
+    }
+  }
+  // 大多数情况 entryId 就是 include:<包名>
+  return bundles.some((b) => b.name === name) ? `include:${name}` : ''
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.on('data', (chunk) => { data += chunk; if (data.length > 8192) reject(new Error('body too large')) })
+    req.on('end', () => resolve(data))
+    req.on('error', reject)
+  })
+}
+
+/**
+ * 开启/关闭插件的点击逻辑。
+ *
+ * 为什么用一段内联脚本而不是服务端表单：重载插件是幂等的两步操作
+ * （改 enabled → 刷新页面），内联脚本比整页 POST 再重定向更省事，
+ * 而且失败时能在原地提示。
+ */
+const TOGGLE_SCRIPT = `<script>
+(function () {
+  document.querySelectorAll('button.toggle').forEach(function (btn) {
+    btn.addEventListener('click', async function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      const name = btn.getAttribute('data-name');
+      const enabled = btn.getAttribute('data-enabled') !== 'true';
+      btn.disabled = true;
+      btn.textContent = enabled ? '开启中…' : '关闭中…';
+      try {
+        const res = await fetch('/dsh-plugin-panel/mobile/toggle?mt=' + encodeURIComponent(window.__MT__ || ''), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: name, enabled: enabled })
+        });
+        if (!res.ok) throw new Error(await res.text() || ('HTTP ' + res.status));
+        // 插件重载后列表会变，直接刷新最省事
+        setTimeout(function () { location.reload(); }, 600);
+      } catch (error) {
+        btn.disabled = false;
+        btn.textContent = '失败';
+        btn.title = String(error && error.message ? error.message : error);
+      }
+    });
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    // window.__MT__ 由页面内联注入
+  });
+})();
+</script>`
 
 function registerMobile(ctx, services) {
   return ctx.webServer.register({
@@ -404,6 +499,31 @@ function registerMobile(ctx, services) {
           'application/json; charset=utf-8')
       }
 
+      // ①.5 开启/关闭插件。手机端也要能重载插件——改完插件代码不用回电脑。
+      // 只认一次性 token（手机连的是局域网/Tailscale，过不了 DSH 的 Host 校验）。
+      if (url.pathname === `${MOBILE_CHANNEL}/toggle`) {
+        if (req.method !== 'POST') return send(405, 'method not allowed')
+        const token = url.searchParams.get('mt')
+        if (!mobileTokenValid(token)) return send(401, '请从 DSH Pocket App 内打开')
+        let payload = {}
+        try { payload = JSON.parse(await readBody(req)) ?? {} } catch { return send(400, 'bad body') }
+        const name = typeof payload.name === 'string' ? payload.name : ''
+        const enabled = payload.enabled === true
+        if (!name) return send(400, 'missing name')
+        try {
+          const states = await readPluginStates(services.pluginManager)
+          const entryId = states.get(name)?.entryId || `include:${name}`
+          if (!entryId) return send(404, `找不到插件 ${name} 的入口`)
+          await services.pluginManager.setPluginEnabled(entryId, enabled)
+          mobileLog(`toggle ${name} -> ${enabled ? 'enabled' : 'disabled'} (${entryId})`)
+          return send(200, JSON.stringify({ ok: true, module: name, enabled }), 'application/json; charset=utf-8')
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          mobileLog(`toggle ${name} failed: ${message}`)
+          return send(500, message)
+        }
+      }
+
       // ② 其余两条都要一次性 token（WebView 带不上 cookie）
       const token = url.searchParams.get('mt')
       if (!mobileTokenValid(token)) return send(401, '请从 DSH Pocket App 内打开')
@@ -417,7 +537,8 @@ function registerMobile(ctx, services) {
       if (url.pathname === MOBILE_CHANNEL) {
         mobileLog(`page host=${req.headers.host} remote=${req.socket?.remoteAddress}`)
         const bundles = await collectBundles(services.pluginManager)
-        return send(200, renderMobilePage(bundles, token), 'text/html; charset=utf-8')
+        const states = await readPluginStates(services.pluginManager)
+        return send(200, renderMobilePage(bundles, token, states), 'text/html; charset=utf-8')
       }
       // 样式独立成一个文件：调字号配色改 mobile/style.css 再刷新即可，不用重启
       if (url.pathname === `${MOBILE_CHANNEL}/style.css`) {
