@@ -189,6 +189,10 @@ window.__ModuleLoader__.load({
         'list.scanNeedDir': '还没有填目录',
         'list.scanFailed': '扫描失败',
         'list.scanInstalled': '{name} 已安装，重启 DSH 后生效',
+        'list.toggleUnavailable': '这个条目不能从这里启停，请用 dsh plugin 命令',
+        'list.toggleFailed': '启停失败',
+        'list.toggleOn': '{name} 已启动',
+        'list.toggleOff': '{name} 已停用',
         'list.stateActive': '运行中',
         'list.stateDisabled': '已停用',
         'list.stateFailed': '启动失败',
@@ -395,6 +399,10 @@ window.__ModuleLoader__.load({
         'list.scanNeedDir': 'No directory yet',
         'list.scanFailed': 'Scan failed',
         'list.scanInstalled': '{name} installed — restart DSH to apply',
+        'list.toggleUnavailable': 'This entry cannot be toggled from here; use the dsh plugin command',
+        'list.toggleFailed': 'Toggle failed',
+        'list.toggleOn': '{name} started',
+        'list.toggleOff': '{name} stopped',
         'list.stateActive': 'Running',
         'list.stateDisabled': 'Disabled',
         'list.stateFailed': 'Failed to start',
@@ -2848,6 +2856,43 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /** 启停一个插件：优先用条目级接口，条目不可控时退回 bundle 级。 */
+      async function toggleScanned(item, nextEnabled) {
+        if (busyKey) return
+        setBusyKey(item.folder)
+        setActionNote('')
+        try {
+          let result = null
+          if (item.canToggle && item.entryId && typeof props.setPluginEnabled === 'function') {
+            result = await props.setPluginEnabled(item.entryId, nextEnabled)
+          } else if (typeof props.setBundleEnabled === 'function') {
+            // 只读条目（management-required / unaddressable）也能用 bundle 层开关，
+            // 这是官方给的另一条路，不是自己改 profile
+            result = await props.setBundleEnabled(item.name, nextEnabled)
+          } else {
+            setActionNote(textOf(t, 'list.toggleUnavailable'))
+            return
+          }
+          if (result && result.ok === false) {
+            const error = result.error || {}
+            setActionNote(`${textOf(t, 'list.toggleFailed')}：${error.message || error.code || 'unknown'}`)
+            return
+          }
+          const value = result && result.ok === true ? result.value : result
+          if (value && value.application === 'failed') {
+            const error = value.error || {}
+            setActionNote(`${textOf(t, 'list.toggleFailed')}：${error.code || 'unknown'}`)
+            return
+          }
+          showToast(textOf(t, nextEnabled ? 'list.toggleOn' : 'list.toggleOff').replace('{name}', item.title || item.name))
+          setTimeout(() => { void runScan(scanDir) }, 800)
+        } catch (failure) {
+          setActionNote(`${textOf(t, 'list.toggleFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        } finally {
+          setBusyKey('')
+        }
+      }
+
       /** 本地扫描：输入一个目录，列出下面所有插件，标出装没装。 */
       function scanView() {
         const items = Array.isArray(scanItems) ? scanItems : []
@@ -2915,19 +2960,22 @@ window.__ModuleLoader__.load({
                                 void installFromPath(item)
                               },
                             }, busyKey === item.folder ? textOf(t, 'list.installing') : textOf(t, 'list.install'))
-                            : item.canToggle && (state === 'disabled' || state === 'inactive')
-                              ? h('button', {
-                                key: 'enable',
+                            : (() => {
+                              // 运行中/启动失败 → 可停用；已停用/已安装 → 可启动
+                              const running = state === 'active' || state === 'failed'
+                              return h('button', {
+                                key: 'toggle',
                                 type: 'button',
-                                className: 'dsh-pl-card-btn is-update',
+                                className: `dsh-pl-card-btn${running ? '' : ' is-update'}`,
+                                disabled: busyKey === item.folder,
                                 onClick: (event) => {
                                   event.stopPropagation()
-                                  if (typeof props.setPluginEnabled === 'function' && item.entryId) {
-                                    void props.setPluginEnabled(item.entryId, true).then(() => { void runScan(scanDir) })
-                                  }
+                                  void toggleScanned(item, !running)
                                 },
-                              }, textOf(t, 'list.enable'))
-                              : null,
+                              }, busyKey === item.folder
+                                ? textOf(t, 'list.updating')
+                                : textOf(t, running ? 'list.disable' : 'list.enable'))
+                            })(),
                           h('button', {
                             key: 'reveal',
                             type: 'button',
@@ -3661,6 +3709,9 @@ window.__ModuleLoader__.load({
         const searchCatalog = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'search', payload || {})
         const searchRemote = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'remote-search', payload || {})
         const remoteDetail = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'remote-detail', payload || {})
+        const setBundleEnabled = typeof pluginManager.setBundleEnabled === 'function'
+          ? pluginManager.setBundleEnabled.bind(pluginManager)
+          : null
         const loadSelfUpdate = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'self-update', payload || {})
         const scanPlugins = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'scan', payload || {})
         const updateBundle = typeof pluginManager.updateBundle === 'function'
@@ -3755,7 +3806,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, searchRemote, remoteDetail, loadSelfUpdate, scanPlugins, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, searchRemote, remoteDetail, loadSelfUpdate, setBundleEnabled, scanPlugins, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }
