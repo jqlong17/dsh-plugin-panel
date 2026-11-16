@@ -3738,19 +3738,17 @@ window.__ModuleLoader__.load({
 .dsh-pl-rows, .dsh-pl-grid { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 8px; }
 .dsh-pl-rows { display: flex; flex-direction: column; gap: 6px; }
 .dsh-pl-grid { display: flex; flex-direction: column; gap: 10px; align-content: start; padding: 12px; }
-/* 列表视图：三行文字各给固定高度，行高才算得准，不会被裁掉
-   20 + 36 + 16 = 72，加两处行间距 4 和上下内边距 24，正好 100 */
+/* 列表视图：行高固定 100，文字按自然高度排版后整体垂直居中
+   —— 不预留空行，简介一行时就紧一些，两行时正好撑满 */
 .dsh-pl-grid:not(.is-card) .dsh-pl-item { height: 100px; min-height: 0; align-items: center; }
 .dsh-pl-grid:not(.is-card) .dsh-pl-copy { overflow: hidden; gap: 2px; justify-content: center; }
 .dsh-pl-grid:not(.is-card) .dsh-pl-copy strong {
-  height: 20px;
   line-height: 20px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .dsh-pl-grid:not(.is-card) .dsh-pl-where {
-  height: 36px;
   line-height: 18px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -3758,12 +3756,12 @@ window.__ModuleLoader__.load({
   overflow: hidden;
 }
 .dsh-pl-grid:not(.is-card) .dsh-pl-meta {
-  height: 16px;
   line-height: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dsh-pl-grid:not(.is-card) .dsh-pl-badges { flex: none; }
 .dsh-pl-grid.is-card { display: grid; grid-template-columns: repeat(auto-fill, 168px); justify-content: start; gap: 10px; align-items: stretch; }
 /* 卡片内部三行网格：图标 / 文字 / 底部（状态左、操作右） */
 .dsh-pl-grid.is-card .dsh-pl-item {
