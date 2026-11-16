@@ -153,7 +153,6 @@ window.__ModuleLoader__.load({
         'list.running': '运行中',
         'list.stopped': '已停用',
         'list.failed': '失败',
-        'list.install': '安装',
         'list.active': '活跃',
         'list.unknown': '未记录',
         
@@ -171,6 +170,11 @@ window.__ModuleLoader__.load({
         'list.installNpm': 'npm 安装',
         'list.installLink': '本地开发（软链）',
         'list.installFile': '本地文件',
+        'list.installTarball': '本地压缩包',
+        'list.installGit': 'Git 仓库',
+        'list.localTagGit': 'Git',
+        'list.localTagNpm': 'npm',
+        'list.localTagTarball': '压缩包',
         'list.localTag': '本地',
         'list.tagEnabled': '已启用',
         'list.tagDisabled': '已停用',
@@ -355,7 +359,6 @@ window.__ModuleLoader__.load({
         'list.running': 'Running',
         'list.stopped': 'Stopped',
         'list.failed': 'Failed',
-        'list.install': 'Installed',
         'list.active': 'Active',
         'list.unknown': 'Unknown',
         
@@ -373,6 +376,11 @@ window.__ModuleLoader__.load({
         'list.installNpm': 'npm',
         'list.installLink': 'Local dev (link)',
         'list.installFile': 'Local file',
+        'list.installTarball': 'Local tarball',
+        'list.installGit': 'Git repo',
+        'list.localTagGit': 'Git',
+        'list.localTagNpm': 'npm',
+        'list.localTagTarball': 'tarball',
         'list.localTag': 'Local',
         'list.tagEnabled': 'Enabled',
         'list.tagDisabled': 'Disabled',
@@ -533,7 +541,11 @@ window.__ModuleLoader__.load({
       const at = raw.lastIndexOf('@')
       const tail = at >= 0 ? raw.slice(at + 1) : raw
       if (tail.startsWith('link:')) return { kind: 'link', path: tail.slice(5) }
-      if (tail.startsWith('file:')) return { kind: 'file', path: tail.slice(5) }
+      if (tail.startsWith('file:')) {
+        // file: 后面是压缩包还是目录，决定算「本地文件」还是「本地压缩包」
+        return /[.](tgz|tar[.]gz)$/i.test(tail) ? { kind: 'tarball', path: tail.slice(5) } : { kind: 'file', path: tail.slice(5) }
+      }
+      if (/^(git[+]|git:|github:)|^https?:\/\/.*[.]git(\b|$)|^git@/i.test(tail)) return { kind: 'git', path: tail }
       return { kind: 'npm', path: '' }
     }
 
@@ -550,6 +562,8 @@ window.__ModuleLoader__.load({
       const info = installSourceOf(bundle)
       if (info.kind === 'link') return `${textOf(t, 'list.installLink')} · ${info.path}`
       if (info.kind === 'file') return `${textOf(t, 'list.installFile')} · ${info.path}`
+      if (info.kind === 'tarball') return `${textOf(t, 'list.installTarball')} · ${info.path}`
+      if (info.kind === 'git') return `${textOf(t, 'list.installGit')} · ${info.path}`
       const version = bundle && bundle.version ? ` · v${bundle.version}` : ''
       return `${textOf(t, 'list.installNpm')}${version}`
     }
@@ -3360,7 +3374,11 @@ window.__ModuleLoader__.load({
                         plugin.fiberPhase === 'failed' ? 'is-failed' : '',
                       ].filter(Boolean).join(' ')
                       const bundle = matchBundle(plugin, bundles)
-                      const localInstall = bundle && installSourceOf(bundle).kind !== 'npm'
+                      const installKind = bundle ? installSourceOf(bundle).kind : ''
+                      const installTag = installKind === 'npm' ? textOf(t, 'list.localTagNpm')
+                        : installKind === 'git' ? textOf(t, 'list.localTagGit')
+                        : installKind === 'tarball' ? textOf(t, 'list.localTagTarball')
+                        : installKind ? textOf(t, 'list.localTag') : ''
                       const state = pluginStateOf(plugin)
                       return h(PluginCard, {
                         key: plugin.entryId,
@@ -3371,7 +3389,7 @@ window.__ModuleLoader__.load({
                         badge: h('span', { className: 'dsh-pl-badges' },
                           h('span', { className: `dsh-pl-local-tag${state === 'failed' ? ' is-failed' : state === 'disabled' ? ' is-off' : ''}` },
                             textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')),
-                          localInstall ? h('span', { className: 'dsh-pl-local-tag' }, textOf(t, 'list.localTag')) : null),
+                          installTag ? h('span', { className: 'dsh-pl-local-tag' }, installTag) : null),
                         onClick: () => setSelectedId(plugin.entryId),
                         actions: [
                           healthChip(title, diagnoses[plugin.entryId], copiedKey === plugin.entryId, () => {
