@@ -1504,7 +1504,57 @@ window.__ModuleLoader__.load({
       '- 差：「还没有纪要」',
       '- 好：「还没有纪要。去『今日』选区间，再点时间轴下方的按钮」',
       '',
-      '## 十二、自检',
+      '## 十二、卡片：一个组件，一套样式',
+      '',
+      '**所有列表用同一张卡片**：已安装、系统内置、本地扫描、7 天榜单、搜索结果、远程结果、精选推荐，',
+      '一个都不能另起炉灶。判断方法只有一个：`grep "h(PluginCard" 应该只有一处`。',
+      '',
+      '卡片面上只放这几样，其它都收进菜单：',
+      '',
+      '```',
+      '┌──────────────┐',
+      '│ [图标]        │',
+      '│ 标题（2 行）   │',
+      '│ 简介（3 行）   │',
+      '│ v0.6.7 · 右侧栏│',
+      '│ [已启用]      │',
+      '│ [   操作   ]  │',
+      '└──────────────┘',
+      '```',
+      '',
+      '### 尺寸',
+      '',
+      '| 视图 | 规则 |',
+      '| --- | --- |',
+      '| 卡片 | `aspect-ratio: 3 / 4`（竖版），`grid-template-columns: repeat(auto-fill, minmax(148px, 1fr))` |',
+      '| 列表 | 最小高度 `68px`，一行一个 |',
+      '',
+      '比例锁死的好处是：内容多寡不影响卡片高度，一屏永远整齐。',
+      '',
+      '### 截断',
+      '',
+      '| 元素 | 卡片视图 | 列表视图 |',
+      '| --- | --- | --- |',
+      '| 标题 | 2 行 `-webkit-line-clamp` | 1 行省略号 |',
+      '| 简介 | 3 行 | 2 行 |',
+      '| meta | 1 行省略号 | 1 行省略号 |',
+      '',
+      '### 状态标只有四种',
+      '',
+      '`已启用`、`已停用`、`启动失败`、`未安装`。不要为某个页面发明第五种措辞。',
+      '',
+      '### 操作全部进菜单',
+      '',
+      '卡片上**只有一个「操作」按钮**，点开是弹出菜单：启停、更新、置顶、卸载、打开、打开所在位置、安装、复制体检报告。',
+      '菜单项按该行的真实状态生成，不显示点不动的项。',
+      '',
+      '### 禁止事项',
+      '',
+      '- 不要为某个页面单独写卡片样式（出现 `.某个容器 .dsh-pl-item` 这种选择器就是走偏了）',
+      '- 不要在卡片上散放按钮，加一个功能就加一个菜单项',
+      '- 不要把状态做成多种说法（「运行中」和「已启用」只能选一个）',
+      '',
+      '## 十三、自检',
       '',
       '- [ ] 没有硬编码字号、圆角、色值',
       '- [ ] 交互蓝用 `state-business-primary`，没把 `brand-primary` 当强调色',
@@ -2947,7 +2997,7 @@ window.__ModuleLoader__.load({
                             : '',
                           bundle ? installSourceText(bundle, t) : '',
                         ].filter(Boolean),
-                        className: installed ? 'is-market' : 'is-market',
+                        className: '',
                         tag: textOf(t, state === 'active' ? 'list.stateActive'
                           : state === 'disabled' ? 'list.stateDisabled'
                           : state === 'failed' ? 'list.stateFailed'
@@ -3236,7 +3286,6 @@ window.__ModuleLoader__.load({
           className: [
             installed && selectedId === plugin.entryId ? 'is-on' : '',
             installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
-            installed ? '' : 'is-market',
           ].filter(Boolean).join(' '),
           tag: installed
             ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
@@ -3282,7 +3331,6 @@ window.__ModuleLoader__.load({
                 className: [
                   plugin && selectedId === plugin.entryId ? 'is-on' : '',
                   plugin && pins.includes(plugin.entryId) ? 'is-pinned' : '',
-                  installed ? '' : 'is-market',
                 ].filter(Boolean).join(' '),
                 tag: installed
                   ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
@@ -3677,13 +3725,54 @@ window.__ModuleLoader__.load({
 .dsh-pl-rows, .dsh-pl-grid { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 8px; }
 .dsh-pl-rows { display: flex; flex-direction: column; gap: 6px; }
 .dsh-pl-grid { display: flex; flex-direction: column; gap: 10px; align-content: start; padding: 12px; }
-.dsh-pl-grid.is-card { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.dsh-pl-grid.is-card .dsh-pl-item { padding: 10px; gap: 8px; }
+/* 列表视图也做同样程度的裁剪，保证各 tab 的行高一致 */
+.dsh-pl-grid:not(.is-card) .dsh-pl-copy strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dsh-pl-grid:not(.is-card) .dsh-pl-where {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dsh-pl-grid:not(.is-card) .dsh-pl-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dsh-pl-grid:not(.is-card) .dsh-pl-item { min-height: 68px; }
+.dsh-pl-grid.is-card { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; align-items: stretch; }
+.dsh-pl-grid.is-card .dsh-pl-item {
+  padding: 12px;
+  gap: 6px;
+  /* 竖版卡片：宽高比锁死 3:4，内容再多也不撑高，靠下面几条裁剪规则收住 */
+  aspect-ratio: 3 / 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  overflow: hidden;
+}
 .dsh-pl-acts { display: flex; gap: 6px; align-items: center; margin-left: auto; flex: none; }
 .dsh-pl-item { position: relative; }
-.dsh-pl-grid.is-card .dsh-pl-acts { position: absolute; top: 8px; right: 8px; margin: 0; padding: 0; background: transparent; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
-.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-card-btn { padding: 4px 8px; font-size: var(--pl-fs-xs); border: 0; background: var(--dsw-alias-bg-layer-2); }
-.dsh-pl-grid.is-card .dsh-pl-item:hover .dsh-pl-acts, .dsh-pl-grid.is-card .dsh-pl-item:focus-within .dsh-pl-acts { opacity: 1; pointer-events: auto; }
+.dsh-pl-grid.is-card .dsh-pl-acts { position: static; margin: 2px 0 0; padding: 0; background: transparent; opacity: 1; pointer-events: auto; align-self: stretch; }
+.dsh-pl-grid.is-card .dsh-pl-item > img,
+.dsh-pl-grid.is-card .dsh-pl-item > svg { width: 30px; height: 30px; flex: none; border-radius: 8px; }
+.dsh-pl-grid.is-card .dsh-pl-copy { flex: 1 1 auto; min-height: 0; gap: 4px; width: 100%; }
+.dsh-pl-grid.is-card .dsh-pl-copy strong {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: var(--pl-fs-lg);
+  line-height: 1.35;
+}
+.dsh-pl-grid.is-card .dsh-pl-where {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.5;
+}
+.dsh-pl-grid.is-card .dsh-pl-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dsh-pl-grid.is-card .dsh-pl-local-tag { flex: none; margin-top: auto; }
+.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-card-btn { width: 100%; padding: 5px 8px; font-size: var(--pl-fs-xs); border: 0; background: var(--dsw-alias-bg-layer-2); justify-content: center; }
 .dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
 .dsh-pl-card-btn { margin-left: 0; flex: none; position: static; }
 .dsh-pl-health { flex: none; margin-left: 0; padding: 4px 9px; border: 0; border-radius: var(--pl-radius-chip); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; white-space: nowrap; }
@@ -3702,8 +3791,6 @@ window.__ModuleLoader__.load({
 .dsh-pl-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
 .dsh-pl-copy strong { font-size: var(--pl-fs-lg); font-weight: 560; color: var(--dsw-alias-label-primary); white-space: normal; overflow-wrap: anywhere; }
 .dsh-pl-where { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
-.dsh-pl-item.is-market .dsh-pl-where { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dsh-pl-item.is-market .dsh-pl-copy strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dsh-pl-item.is-failed { border-color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-state { margin: 16px; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-detail { flex: 1 1 auto; width: auto; max-width: none; min-width: 0; min-height: 0; overflow: auto; background: var(--dsw-alias-bg-base); padding: 12px 16px 20px; }
