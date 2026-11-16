@@ -20,6 +20,7 @@ window.__ModuleLoader__.load({
         'list.refresh': '刷新',
         'list.market': '插件市场',
         'list.featured': '精选推荐',
+        'list.featuredTitle': '编辑精选',
         'list.design': '设计规范',
         'list.about': '关于',
         'list.aboutWhat': '这个插件做什么',
@@ -167,6 +168,10 @@ window.__ModuleLoader__.load({
         'list.package': '包名',
         'list.version': '版本',
         'list.source': '来源',
+        'list.installNpm': 'npm 安装',
+        'list.installLink': '本地开发（软链）',
+        'list.installFile': '本地文件',
+        'list.localTag': '本地',
         'list.doc': '说明文档',
         
         'list.docLoading': '正在读取说明…',
@@ -199,6 +204,7 @@ window.__ModuleLoader__.load({
         'list.refresh': 'Refresh',
         'list.market': 'Plugin market',
         'list.featured': 'Featured',
+        'list.featuredTitle': "Editor's picks",
         'list.featuredFoot': 'To suggest a plugin or have yours listed, contact us on WeChat: ruskacoffee',
         'list.design': 'Design spec',
         'list.about': 'About',
@@ -346,6 +352,10 @@ window.__ModuleLoader__.load({
         'list.package': 'Package',
         'list.version': 'Version',
         'list.source': 'Source',
+        'list.installNpm': 'npm',
+        'list.installLink': 'Local dev (link)',
+        'list.installFile': 'Local file',
+        'list.localTag': 'Local',
         'list.doc': 'Notes',
         
         'list.docLoading': 'Reading notes…',
@@ -474,6 +484,30 @@ window.__ModuleLoader__.load({
       }
       if (last < text.length) nodes.push(text.slice(last))
       return nodes
+    }
+
+    /**
+     * 判断插件是怎么装进来的。
+     *
+     * DSH 的 bundle.source 形如 `包名@版本`、`包名@link:/path`、`包名@file:/path`，
+     * 取最后一个 @ 之后的部分就能分清：软链 = 本地开发，file = 本地文件，其余 = npm。
+     */
+    function installSourceOf(bundle) {
+      const raw = String((bundle && bundle.source) || '')
+      const at = raw.lastIndexOf('@')
+      const tail = at >= 0 ? raw.slice(at + 1) : raw
+      if (tail.startsWith('link:')) return { kind: 'link', path: tail.slice(5) }
+      if (tail.startsWith('file:')) return { kind: 'file', path: tail.slice(5) }
+      return { kind: 'npm', path: '' }
+    }
+
+    /** 安装方式的一行说明：npm 显示来源，本地显示路径。 */
+    function installSourceText(bundle, t) {
+      const info = installSourceOf(bundle)
+      if (info.kind === 'link') return `${textOf(t, 'list.installLink')} · ${info.path}`
+      if (info.kind === 'file') return `${textOf(t, 'list.installFile')} · ${info.path}`
+      const version = bundle && bundle.version ? ` · v${bundle.version}` : ''
+      return `${textOf(t, 'list.installNpm')}${version}`
     }
 
     function directoryFromSource(source) {
@@ -2274,7 +2308,7 @@ window.__ModuleLoader__.load({
           { label: textOf(t, 'list.package'), value: (manifest && manifest.name) || (selectedBundle && selectedBundle.name) || shortModule(plugin.moduleName) },
           { label: textOf(t, 'list.version'), value: (manifest && manifest.version) || (selectedBundle && selectedBundle.version) },
           { label: textOf(t, 'list.place'), value: place },
-          { label: textOf(t, 'list.source'), value: source },
+          { label: textOf(t, 'list.source'), value: installSourceText(selectedBundle, t) },
           { label: textOf(t, 'list.flags'), value: flags },
           { label: textOf(t, 'list.components'), value: componentText },
           { label: textOf(t, 'list.license'), value: manifest && manifest.license },
@@ -2790,7 +2824,9 @@ window.__ModuleLoader__.load({
         // 用和「已安装插件」一样的外壳：页面本身不加内边距，只由网格和子标签各留 12px，
         // 否则两边合起来变成 24px，卡片会明显往中间缩
         return h('div', { className: 'dsh-pl-body' },
-          h('div', { className: 'dsh-pl-subtabs' }, viewToggle()),
+          h('div', { className: 'dsh-pl-subtabs' },
+            h('strong', { className: 'dsh-pl-section-title' }, textOf(t, 'list.featuredTitle')),
+            viewToggle()),
           h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
             CURATED.map((item) => {
               const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
@@ -3126,12 +3162,15 @@ window.__ModuleLoader__.load({
                         pinned ? 'is-pinned' : '',
                         plugin.fiberPhase === 'failed' ? 'is-failed' : '',
                       ].filter(Boolean).join(' ')
+                      const bundle = matchBundle(plugin, bundles)
+                      const localInstall = bundle && installSourceOf(bundle).kind !== 'npm'
                       return h(PluginCard, {
                         key: plugin.entryId,
                         icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
                         title,
                         subtitle: places,
                         className: classes,
+                        badge: localInstall ? h('span', { className: 'dsh-pl-local-tag' }, textOf(t, 'list.localTag')) : null,
                         onClick: () => setSelectedId(plugin.entryId),
                         actions: [
                           healthChip(title, diagnoses[plugin.entryId], copiedKey === plugin.entryId, () => {
@@ -3332,6 +3371,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dsh-pl-block-head > .dsh-pl-view { flex: none; margin-left: 4px; }
 .dsh-pl-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.dsh-pl-section-title { font-size: var(--pl-fs-md); font-weight: 600; color: var(--dsw-alias-label-primary); margin-right: auto; }
+.dsh-pl-local-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-market .dsh-pl-grid { padding-left: 0; padding-right: 0; }
 .dsh-pl-head-right > .dsh-pl-view { margin-left: 0; }
 .dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
