@@ -1552,6 +1552,7 @@ window.__ModuleLoader__.load({
       '',
       '- 不要为某个页面单独写卡片样式（出现 `.某个容器 .dsh-pl-item` 这种选择器就是走偏了）',
       '- 不要在卡片上散放按钮，加一个功能就加一个菜单项',
+      '- 卡片显示什么内容只有一个来源：`cardEntry()`。视图里出现 `title:` / `subtitle:` / `meta:` 的拼装就是走偏了',
       '- 不要把状态做成多种说法（「运行中」和「已启用」只能选一个）',
       '',
       '## 十三、自检',
@@ -2980,40 +2981,7 @@ window.__ModuleLoader__.load({
                   : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                     items.map((item) => {
                       const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
-                      const bundle = plugin ? matchBundle(plugin, bundles) : null
-                      const state = item.state || (item.installed ? 'active' : 'missing')
-                      const installed = state !== 'missing'
-                      return unifiedCard({
-                        key: item.folder,
-                        iconUrl: plugin ? safeIcon(plugin.meta && plugin.meta.icon) : '',
-                        title: item.title || item.name,
-                        subtitle: item.folder,
-                        meta: [
-                          item.version ? `v${item.version}` : '',
-                          installed && plugin
-                            ? placesFor(plugin, guide, seats, localeId)
-                              .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
-                              .join(' · ')
-                            : '',
-                          bundle ? installSourceText(bundle, t) : '',
-                        ].filter(Boolean),
-                        className: '',
-                        tag: textOf(t, state === 'active' ? 'list.stateActive'
-                          : state === 'disabled' ? 'list.stateDisabled'
-                          : state === 'failed' ? 'list.stateFailed'
-                          : state === 'inactive' ? 'list.stateInactive'
-                          : 'list.notInstalled'),
-                        tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
-                        onClick: () => {
-                          if (plugin) setSelectedId(plugin.entryId)
-                        },
-                        plugin,
-                        bundle,
-                        scan: item,
-                        name: item.name,
-                        installed,
-                        state,
-                      })
+                      return unifiedCard(cardEntry({ scan: item, plugin }))
                     })))
       }
 
@@ -3132,6 +3100,102 @@ window.__ModuleLoader__.load({
         }
 
         return items
+      }
+
+      /**
+       * 卡片内容的**唯一**来源。
+       *
+       * 四个视图只负责把「这一行是什么」传进来：`{ plugin }`、`{ row }`、`{ scan }`、`{ curated }`。
+       * 标题怎么写、副标题放什么、meta 有哪几段、状态标用哪个词，全部在这里决定。
+       * 以后要改卡片显示，只改这个函数，视图不用动。
+       */
+      function cardEntry(input) {
+        const { plugin = null, row = null, scan = null, curated = null } = input || {}
+        const bundle = plugin ? matchBundle(plugin, bundles) : null
+        const installed = Boolean(plugin)
+        const state = installed ? pluginStateOf(plugin) : 'missing'
+
+        const iconUrl = installed
+          ? safeIcon(plugin.meta && plugin.meta.icon)
+          : safeIcon(row && row.icon)
+        const places = installed
+          ? placesFor(plugin, guide, seats, localeId)
+            .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
+            .join(' · ') || textOf(t, 'list.placeNone')
+          : ''
+
+        let name = ''
+        let title = ''
+        let subtitle = ''
+        if (installed) {
+          name = String(plugin.moduleName || '')
+          title = pluginTitle(plugin, localeId)
+          subtitle = resolveText(plugin.meta && plugin.meta.description, localeId)
+        } else if (curated) {
+          name = curated.name
+          title = curated.title
+          subtitle = curated.reason || ''
+        } else if (scan) {
+          name = scan.name
+          title = scan.title || scan.name
+          subtitle = scan.folder
+        } else if (row) {
+          name = row.name
+          title = row.name
+          subtitle = row.summary || row.categoryZh || row.category || ''
+        }
+
+        const meta = []
+        if (scan) {
+          if (scan.version) meta.push(`v${scan.version}`)
+          if (places) meta.push(places)
+          if (bundle) meta.push(installSourceText(bundle, t))
+        } else if (installed) {
+          if (bundle && bundle.version) meta.push(`v${bundle.version}`)
+          if (places) meta.push(places)
+        } else if (row) {
+          if (row.version) meta.push(`v${row.version}`)
+          if (typeof row.stars === 'number' && row.stars > 0) meta.push(`★ ${compactNumber(row.stars)}`)
+          const ago = relativeDay(row.publishedAt || row.date || '')
+          if (ago) meta.push(ago)
+          if (typeof row.delta === 'number' && row.delta > 0) meta.push(`+${compactNumber(row.delta)}`)
+        }
+
+        const tag = installed
+          ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
+          : (scan && state !== 'missing'
+            ? textOf(t, state === 'active' ? 'list.stateActive'
+              : state === 'disabled' ? 'list.stateDisabled'
+              : state === 'failed' ? 'list.stateFailed'
+              : 'list.stateInactive')
+            : textOf(t, 'list.notInstalled'))
+        const tagClass = state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : ''
+
+        let onClick
+        if (installed) onClick = () => setSelectedId(plugin.entryId)
+        else if (curated) onClick = () => setSelectedMarket({ name: curated.name, title: curated.title, summary: curated.reason, remote: true })
+        else if (row) onClick = () => setSelectedMarket(row)
+
+        return {
+          key: installed ? plugin.entryId : (scan ? scan.folder : name),
+          iconUrl,
+          title,
+          subtitle,
+          meta,
+          tag,
+          tagClass,
+          className: [
+            installed && selectedId === plugin.entryId ? 'is-on' : '',
+            installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
+          ].filter(Boolean).join(' '),
+          onClick,
+          plugin,
+          bundle,
+          scan,
+          name,
+          installed,
+          state,
+        }
       }
 
       /** 统一卡片：面上只有图标、名字、副标题、状态和「操作」，其余都进菜单。 */
@@ -3254,53 +3318,7 @@ window.__ModuleLoader__.load({
        * 的卡片长得一样、点起来也一样。
        */
       function marketCard(row) {
-        const plugin = plugins.find((p) => p.moduleName === row.name || p.patchId === row.name)
-        const installed = Boolean(plugin)
-        const bundle = plugin ? matchBundle(plugin, bundles) : null
-        const state = installed ? pluginStateOf(plugin) : 'missing'
-        const iconUrl = installed
-          ? safeIcon(plugin.meta && plugin.meta.icon)
-          : safeIcon(row.icon)
-        const places = installed
-          ? placesFor(plugin, guide, seats, localeId)
-            .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
-            .join(' · ') || textOf(t, 'list.placeNone')
-          : ''
-        return unifiedCard({
-          key: row.repo || row.name,
-          iconUrl,
-          title: installed ? pluginTitle(plugin, localeId) : row.name,
-          subtitle: installed
-            ? resolveText(plugin.meta && plugin.meta.description, localeId)
-            : (row.summary || row.categoryZh || row.category || ''),
-          meta: (() => {
-            const parts = []
-            if (row.version) parts.push(`v${row.version}`)
-            if (installed && places) parts.push(places)
-            if (typeof row.stars === 'number' && row.stars > 0) parts.push(`★ ${compactNumber(row.stars)}`)
-            const ago = relativeDay(row.publishedAt || row.date || '')
-            if (ago) parts.push(ago)
-            if (typeof row.delta === 'number' && row.delta > 0) parts.push(`+${compactNumber(row.delta)}`)
-            return parts
-          })(),
-          className: [
-            installed && selectedId === plugin.entryId ? 'is-on' : '',
-            installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
-          ].filter(Boolean).join(' '),
-          tag: installed
-            ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
-            : textOf(t, 'list.notInstalled'),
-          tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
-          onClick: () => {
-            if (installed) setSelectedId(plugin.entryId)
-            else setSelectedMarket(row)
-          },
-          plugin,
-          bundle,
-          name: row.name,
-          installed,
-          state,
-        })
+        return unifiedCard(cardEntry({ row }))
       }
 
       function featuredView() {
@@ -3313,39 +3331,7 @@ window.__ModuleLoader__.load({
           h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
             CURATED.map((item) => {
               const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
-              const installed = Boolean(plugin)
-              const bundle = plugin ? matchBundle(plugin, bundles) : null
-              const state = installed ? pluginStateOf(plugin) : 'missing'
-              const iconUrl = plugin ? safeIcon(plugin.meta && plugin.meta.icon) : ''
-              const places = plugin
-                ? placesFor(plugin, guide, seats, localeId)
-                  .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
-                  .join(' · ') || textOf(t, 'list.placeNone')
-                : ''
-              return unifiedCard({
-                key: item.name,
-                iconUrl,
-                title: plugin ? pluginTitle(plugin, localeId) : item.title,
-                subtitle: installed ? resolveText(plugin.meta && plugin.meta.description, localeId) : (item.reason || ''),
-                meta: [bundle && bundle.version ? `v${bundle.version}` : '', installed ? places : ''].filter(Boolean),
-                className: [
-                  plugin && selectedId === plugin.entryId ? 'is-on' : '',
-                  plugin && pins.includes(plugin.entryId) ? 'is-pinned' : '',
-                ].filter(Boolean).join(' '),
-                tag: installed
-                  ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
-                  : textOf(t, 'list.notInstalled'),
-                tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
-                onClick: () => {
-                  if (plugin) setSelectedId(plugin.entryId)
-                  else setSelectedMarket({ name: item.name, title: item.title, summary: item.reason, remote: true })
-                },
-                plugin,
-                bundle,
-                name: item.name,
-                installed,
-                state,
-              })
+              return unifiedCard(cardEntry(plugin ? { plugin } : { curated: item }))
             })),
           h('p', { className: 'dsh-pl-note dsh-pl-featured-foot' }, textOf(t, 'list.featuredContact')))
       }
@@ -3663,27 +3649,7 @@ window.__ModuleLoader__.load({
                         : installKind === 'git' ? textOf(t, 'list.localTagGit')
                         : installKind === 'tarball' ? textOf(t, 'list.localTagTarball')
                         : installKind ? textOf(t, 'list.localTag') : ''
-                      const state = pluginStateOf(plugin)
-                      const intro = resolveText(plugin.meta && plugin.meta.description, localeId)
-                      return unifiedCard({
-                        key: plugin.entryId,
-                        iconUrl,
-                        title,
-                        subtitle: intro,
-                        meta: [
-                          bundle && bundle.version ? `v${bundle.version}` : '',
-                          places,
-                        ].filter(Boolean),
-                        className: classes,
-                        tag: textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled'),
-                        tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
-                        onClick: () => setSelectedId(plugin.entryId),
-                        plugin,
-                        bundle,
-                        name: plugin.moduleName,
-                        installed: true,
-                        state,
-                      })
+                      return unifiedCard(cardEntry({ plugin }))
                     }))))
     }
 
