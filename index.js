@@ -166,14 +166,30 @@ function scanPluginDir(root, services) {
   return { dir, items, error: '' }
 }
 
-/** 扫出来的包哪些已经在 profile 里了（按包名，或按 source 里的路径对上）。 */
+/**
+ * 扫出来的包在 profile 里是什么状态。
+ *
+ * 「装了」不等于「在跑」，所以分成五种：
+ *   missing  不在 profile 里
+ *   disabled 在 profile 里但被停用
+ *   failed   启用了，但运行时报错没起来
+ *   active   正在运行
+ *   inactive 在 profile 里、也没被停用，但没有对应的运行条目（少见，通常是刚装还没加载）
+ */
 async function markScanned(pluginManager, scanned) {
   let bundles = []
+  let plugins = []
   try {
     bundles = await pluginManager.listBundles()
   } catch {
     bundles = []
   }
+  try {
+    plugins = await pluginManager.listPlugins()
+  } catch {
+    plugins = []
+  }
+
   const byName = new Map()
   const byPath = new Map()
   for (const bundle of Array.isArray(bundles) ? bundles : []) {
@@ -186,14 +202,33 @@ async function markScanned(pluginManager, scanned) {
       byPath.set(path.resolve(tail.slice(tail.indexOf(':') + 1)), bundle)
     }
   }
+
+  const running = new Map()
+  for (const plugin of Array.isArray(plugins) ? plugins : []) {
+    if (plugin && typeof plugin.moduleName === 'string') running.set(plugin.moduleName, plugin)
+  }
+
   return scanned.map((item) => {
-    const byPathHit = byPath.get(path.resolve(item.folder))
-    const hit = byPathHit || byName.get(item.name)
+    const bundle = byPath.get(path.resolve(item.folder)) || byName.get(item.name) || null
+    const plugin = running.get(item.name) || null
+    let state = 'missing'
+    if (bundle && bundle.installed !== false) {
+      if (plugin) {
+        if (plugin.fiberPhase === 'failed') state = 'failed'
+        else if (plugin.enabled === false) state = 'disabled'
+        else state = 'active'
+      } else {
+        state = bundle.enabled === false ? 'disabled' : 'inactive'
+      }
+    }
     return {
       ...item,
-      installed: Boolean(hit && hit.installed !== false),
-      installedSource: hit && typeof hit.source === 'string' ? hit.source : '',
-      installedVersion: hit && typeof hit.version === 'string' ? hit.version : '',
+      installed: state !== 'missing',
+      state,
+      entryId: plugin && typeof plugin.entryId === 'string' ? plugin.entryId : '',
+      canToggle: Boolean(plugin && plugin.patchId && plugin.readOnlyReason == null),
+      installedSource: bundle && typeof bundle.source === 'string' ? bundle.source : '',
+      installedVersion: bundle && typeof bundle.version === 'string' ? bundle.version : '',
     }
   })
 }

@@ -182,6 +182,11 @@ window.__ModuleLoader__.load({
         'list.scanNeedDir': '还没有填目录',
         'list.scanFailed': '扫描失败',
         'list.scanInstalled': '{name} 已安装，重启 DSH 后生效',
+        'list.stateActive': '运行中',
+        'list.stateDisabled': '已停用',
+        'list.stateFailed': '启动失败',
+        'list.stateInactive': '已安装',
+        'list.scanStateHint': '「运行中」= 已装且已启用；「已停用」= 装了但关着；「启动失败」= 启用了但没起来；「未安装」= 不在 profile 里。',
         'list.doc': '说明文档',
         
         'list.docLoading': '正在读取说明…',
@@ -376,6 +381,11 @@ window.__ModuleLoader__.load({
         'list.scanNeedDir': 'No directory yet',
         'list.scanFailed': 'Scan failed',
         'list.scanInstalled': '{name} installed — restart DSH to apply',
+        'list.stateActive': 'Running',
+        'list.stateDisabled': 'Disabled',
+        'list.stateFailed': 'Failed to start',
+        'list.stateInactive': 'Installed',
+        'list.scanStateHint': 'Running = installed and enabled; Disabled = installed but off; Failed = enabled but it did not start; Not installed = absent from the profile.',
         'list.doc': 'Notes',
         
         'list.docLoading': 'Reading notes…',
@@ -2825,6 +2835,7 @@ window.__ModuleLoader__.load({
               onClick: () => { void runScan(scanDir) },
             }, scanStatus === 'loading' ? textOf(t, 'list.scanning') : textOf(t, 'list.scanButton'))),
           h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.scanHint')),
+          h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.scanStateHint')),
           scanStatus === 'loading'
             ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.scanning'))
             : scanError
@@ -2836,21 +2847,26 @@ window.__ModuleLoader__.load({
                   : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                     items.map((item) => {
                       const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
-                      const installed = Boolean(item.installed || plugin)
+                      const state = item.state || (item.installed ? 'active' : 'missing')
+                      const installed = state !== 'missing'
+                      const stateLabel = textOf(t, state === 'active' ? 'list.stateActive'
+                        : state === 'disabled' ? 'list.stateDisabled'
+                        : state === 'failed' ? 'list.stateFailed'
+                        : state === 'inactive' ? 'list.stateInactive'
+                        : 'list.notInstalled')
                       return h(PluginCard, {
                         key: item.folder,
                         icon: plugin ? h('img', { src: safeIcon(plugin.meta && plugin.meta.icon), alt: '', draggable: false }) : null,
                         title: item.title || item.name,
                         subtitle: item.folder,
                         className: 'is-market',
-                        badge: h('span', { className: 'dsh-pl-local-tag' }, installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled')),
+                        badge: h('span', { className: `dsh-pl-local-tag${state === 'failed' ? ' is-failed' : state === 'disabled' ? ' is-off' : ''}` }, stateLabel),
                         onClick: () => {
                           if (plugin) setSelectedId(plugin.entryId)
                         },
                         actions: [
-                          installed
-                            ? null
-                            : h('button', {
+                          !installed
+                            ? h('button', {
                               key: 'install',
                               type: 'button',
                               className: 'dsh-pl-card-btn',
@@ -2859,7 +2875,20 @@ window.__ModuleLoader__.load({
                                 event.stopPropagation()
                                 void installFromPath(item)
                               },
-                            }, busyKey === item.folder ? textOf(t, 'list.installing') : textOf(t, 'list.install')),
+                            }, busyKey === item.folder ? textOf(t, 'list.installing') : textOf(t, 'list.install'))
+                            : item.canToggle && (state === 'disabled' || state === 'inactive')
+                              ? h('button', {
+                                key: 'enable',
+                                type: 'button',
+                                className: 'dsh-pl-card-btn is-update',
+                                onClick: (event) => {
+                                  event.stopPropagation()
+                                  if (typeof props.setPluginEnabled === 'function' && item.entryId) {
+                                    void props.setPluginEnabled(item.entryId, true).then(() => { void runScan(scanDir) })
+                                  }
+                                },
+                              }, textOf(t, 'list.enable'))
+                              : null,
                           h('button', {
                             key: 'reveal',
                             type: 'button',
@@ -3530,6 +3559,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-scan-bar .dsh-pl-search { flex: 1 1 auto; margin: 0; }
 .dsh-pl-section-title { font-size: var(--pl-fs-md); font-weight: 600; color: var(--dsw-alias-label-primary); margin-right: auto; }
 .dsh-pl-local-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
+.dsh-pl-local-tag.is-off { color: var(--dsw-alias-state-warn-label); }
+.dsh-pl-local-tag.is-failed { color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-market .dsh-pl-grid { padding-left: 0; padding-right: 0; }
 .dsh-pl-head-right > .dsh-pl-view { margin-left: 0; }
 .dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
