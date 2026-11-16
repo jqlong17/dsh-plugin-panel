@@ -507,35 +507,49 @@ function registerMobileCheckTool(ctx, services) {
     // DSH 要求工具声明输出形状（dsh-tools/lib/index.js:436）：
     //   must declare output { schema, render, presentationMeta? }
     // schema 用参数式 spec（和 parameters 同一套），render 把结果转成给模型看的文本。
+    // output.schema 要的是 **JSON Schema**（不是 parameters 那种参数式 spec），
+    // 支持的子集：type / oneOf / properties / required / additionalProperties / items / enum / const。
+    // 写成 { ok: {type:'boolean'} } 这种参数式会被拒：schema.ok is not a supported keyword。
     output: {
       schema: {
-        ok: { type: 'boolean', description: 'All checks passed.' },
-        summary: { type: 'string', description: 'One-line result.' },
-        results: {
-          type: 'array',
-          description: 'Per-check results.',
-          items: {
-            type: 'object',
-            properties: {
-              level: { type: 'string' },
-              id: { type: 'string' },
-              ok: { type: 'boolean' },
-              detail: { type: 'string' },
-              hint: { type: 'string' },
+        type: 'object',
+        properties: {
+          ok: { type: 'boolean', description: 'All checks passed.' },
+          summary: { type: 'string', description: 'One-line result.' },
+          results: {
+            type: 'array',
+            description: 'Per-check results.',
+            items: {
+              type: 'object',
+              properties: {
+                level: { type: 'string' },
+                id: { type: 'string' },
+                ok: { type: 'boolean' },
+                detail: { type: 'string' },
+                hint: { type: 'string' },
+              },
+              additionalProperties: true,
             },
           },
+          error: { type: 'string' },
         },
-        error: { type: 'string' },
+        additionalProperties: true,
       },
+      // render 的返回值直接当 tool result 的 content，**必须是数组**，
+      // 返回字符串会炸 `content.some is not a function`。
       render(_args, value) {
-        if (value?.error) return `诊断失败：${value.error}`
-        const lines = [value?.summary ?? '']
-        for (const item of value?.results ?? []) {
-          const mark = item.ok ? '✓' : item.level === 'error' ? '✗' : '!'
-          lines.push(`${mark} ${item.id} — ${item.detail}`)
-          if (!item.ok && item.hint) lines.push(`    ↳ ${item.hint}`)
+        const lines = []
+        if (value?.error) {
+          lines.push(`诊断失败：${value.error}`)
+        } else {
+          lines.push(value?.summary ?? '')
+          for (const item of value?.results ?? []) {
+            const mark = item.ok ? '✓' : item.level === 'error' ? '✗' : '!'
+            lines.push(`${mark} ${item.id} — ${item.detail}`)
+            if (!item.ok && item.hint) lines.push(`    ↳ ${item.hint}`)
+          }
         }
-        return lines.join('\n')
+        return [{ type: 'text', text: lines.join('\n') }]
       },
     },
     async execute({ dir }) {
