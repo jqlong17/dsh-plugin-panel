@@ -42,8 +42,8 @@
       "homepage": "https://github.com/jqlong17/dsh-plugins-ui",
       "versions": [
         {
-          "version": "0.1.13",
-          "publishTimestamp": 1794806555,
+          "version": "0.1.14",
+          "publishTimestamp": 1794808102,
           "source": {
             "type": "npm"
           },
