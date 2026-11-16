@@ -503,7 +503,8 @@ async function collectSearch(readCache, writeCache, query, limit = 100, sort = '
   for (const row of index.rows) {
     if (category && row.category !== category) continue
     if (!needle) { matched.push(row); continue }
-    const haystack = `${row.name} ${row.summary} ${row.category} ${row.categoryZh || ''}`.toLowerCase()
+    const keywords = Array.isArray(row.keywords) ? row.keywords.join(' ') : ''
+    const haystack = `${row.name} ${row.summary} ${row.category} ${row.categoryZh || ''} ${keywords}`.toLowerCase()
     if (terms.some((term) => haystack.includes(term))) matched.push(row)
   }
 
@@ -530,4 +531,107 @@ async function collectSearch(readCache, writeCache, query, limit = 100, sort = '
   }
 }
 
-export { collectTrend, collectHot, collectSearch }
+/** npm 包名：`name` 或 `@scope/name`，只允许出现安全字符。 */
+const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/i
+
+function packagePath(name) {
+  return name.startsWith('@') ? `@${encodeURIComponent(name.slice(1))}` : encodeURIComponent(name)
+}
+
+/** 名字像 dsh 插件，或者标了 dsh / deepseek-harness 关键词。 */
+function looksLikeDshPlugin(name, keywords) {
+  if (/(^|\/)dsh[-.]/i.test(String(name || ''))) return true
+  const list = Array.isArray(keywords) ? keywords.map((k) => String(k).toLowerCase()) : []
+  return list.some((k) => k === 'dsh' || k === 'dsh-plugin' || k === 'deepseek-harness' || k.includes('dsh-plugin'))
+}
+
+/** 一个包的最新清单：`/<name>/latest`，一次请求就够。 */
+async function fetchPackageLatest(name) {
+  try {
+    const row = await fetchJson(`${REGISTRY}/${packagePath(name)}/latest`, 8000)
+    if (!row || typeof row.name !== 'string') return null
+    // 不是 DSH 插件的包不返回——用户搜「images」不该拿到一个通用图像库
+    if (!looksLikeDshPlugin(row.name, row.keywords)) return null
+    const repo = row.repository
+    const dist = row.dist && typeof row.dist === 'object' ? row.dist : {}
+    return {
+      name: row.name,
+      version: String(row.version || ''),
+      summary: typeof row.description === 'string' ? row.description.slice(0, 240) : '',
+      license: typeof row.license === 'string' ? row.license : '',
+      // 原样保留：monorepo 的 directory 决定链接指向子目录
+      repo: repo && typeof repo === 'object' ? repo : (typeof repo === 'string' ? repo : ''),
+      keywords: Array.isArray(row.keywords) ? row.keywords.map(String).slice(0, 8) : [],
+      unpackedSize: Number(dist.unpackedSize) || 0,
+      fileCount: Number(dist.fileCount) || 0,
+      remote: true,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** 结果必须真的和查询有关：查询里的词都得出现。 */
+function relevantTo(item, needle) {
+  const hay = `${item.name} ${item.summary}`.toLowerCase()
+  const tokens = needle.toLowerCase().split(/\s+/).filter((t) => t.length >= 2)
+  return tokens.length > 0 && tokens.every((t) => hay.includes(t))
+}
+
+/** npm 模糊搜索：先按 DSH 形态筛，再按相关性筛。 */
+async function searchNpm(query, limit) {
+  const url = `${REGISTRY}/-/v1/search?text=${encodeURIComponent(query)}&size=${Math.max(20, limit)}`
+  const data = await fetchJson(url, 10000)
+  const objects = Array.isArray(data && data.objects) ? data.objects : []
+  const items = []
+  for (const entry of objects) {
+    const pkg = entry && entry.package
+    if (!pkg || typeof pkg.name !== 'string' || !pkg.name) continue
+    if (!looksLikeDshPlugin(pkg.name, pkg.keywords)) continue
+    const row = {
+      name: pkg.name,
+      version: String(pkg.version || ''),
+      summary: typeof pkg.description === 'string' ? pkg.description.slice(0, 240) : '',
+      date: String(pkg.date || ''),
+      remote: true,
+    }
+    if (!relevantTo(row, query)) continue
+    items.push(row)
+  }
+  items.sort((a, b) => b.date.localeCompare(a.date))
+  return items.slice(0, limit)
+}
+
+/**
+ * 本地索引没命中时补一次 npm 实时查询。
+ *
+ * - `@scope/name` 只做精确查询，不猜。
+ * - 其它先按完整包名精确查一次（用户可能粘贴了不带 scope 的名字），
+ *   查不到再退回搜索，搜索要求命中的包确实与查询相关。
+ * 典型场景：插件刚发布，目录索引还没收录。
+ */
+async function collectRemoteSearch(payload) {
+  const input = payload && typeof payload === 'object' ? payload : {}
+  const query = String(input.query || '').trim()
+  if (!query) return { query: '', items: [], total: 0, mode: 'none' }
+
+  const scoped = query.startsWith('@')
+  if (PACKAGE_NAME_RE.test(query)) {
+    const exact = await fetchPackageLatest(query)
+    if (exact) return { query, items: [exact], total: 1, mode: 'exact' }
+  }
+  if (scoped) return { query, items: [], total: 0, mode: 'exact' }
+
+  const items = await searchNpm(query, 12)
+  return { query, items, total: items.length, mode: 'search' }
+}
+
+/** 点开某个 npm 结果时补全它的元信息（体积、许可、仓库、关键词）。 */
+async function collectRemoteDetail(payload) {
+  const input = payload && typeof payload === 'object' ? payload : {}
+  const name = typeof input.name === 'string' ? input.name.trim() : ''
+  if (!name) return null
+  return fetchPackageLatest(name)
+}
+
+export { collectTrend, collectHot, collectSearch, collectRemoteSearch, collectRemoteDetail }

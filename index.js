@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectHot, collectSearch, collectTrend } from './trend.js'
+import { collectHot, collectRemoteDetail, collectRemoteSearch, collectSearch, collectTrend } from './trend.js'
 
 // 插件自身所在目录与 node_modules 根：移动端要扫 package.json 找 dsh.mobile，
 // 日志也要落在插件目录里。**必须定义在所有引用它们的常量之前**——
@@ -87,6 +87,8 @@ export function apply(ctx) {
     scoped.effect(() => registerDetailRpc(scoped, { tools, pluginManager }), 'plugin-canvas: detail rpc')
     // 移动端：一次性 token + 移动版页面 + 聚合接口
     scoped.effect(() => registerMobile(scoped, { pluginManager }), 'plugin-canvas: mobile routes')
+    // 每天检查一次自己的更新（软链安装会跳过）
+    scoped.effect(() => scheduleSelfUpdate(pluginManager), 'plugin-canvas: self update')
     // 移动端接入诊断：把 scripts/check-plugin-mobile.mjs 的判断暴露成工具，
     // 这样别的插件维护者（或智能体）能直接调，不用自己拼 curl。
     //
@@ -102,6 +104,111 @@ export function apply(ctx) {
       }
     }, 'plugin-canvas: mobile check tool')
   })
+}
+
+// ── 自我更新 ──────────────────────────────────────────────────
+// 每天查一次 npm，有新版就装上；装完必须重启 DSH 才生效（host 模块不会热替换）。
+//
+// 两条硬约束：
+//   1. **软链安装（开发环境）绝不自动更新**——源码就是真相，覆盖它等于把工作区清了
+//   2. 更新失败只记录，不重试、不影响插件运行
+const SELF_UPDATE_FIRST_DELAY_MS = 3 * 60 * 1000
+const SELF_UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000
+const SELF_REGISTRY = 'https://registry.npmjs.org'
+
+const selfUpdateState = {
+  checkedAt: 0,
+  installed: '',
+  latest: '',
+  status: 'idle',   // idle | skipped | up-to-date | updated | failed
+  note: '',
+}
+
+function compareSemver(a, b) {
+  const norm = (v) => String(v || '').replace(/^v/, '').split(/[.+-]/).slice(0, 3).map((n) => parseInt(n, 10) || 0)
+  const x = norm(a)
+  const y = norm(b)
+  for (let i = 0; i < 3; i += 1) if (x[i] !== y[i]) return x[i] - y[i]
+  return 0
+}
+
+async function fetchPublishedVersion(name) {
+  const response = await fetch(`${SELF_REGISTRY}/-/package/${encodeURIComponent(name)}/dist-tags`, {
+    signal: AbortSignal.timeout(8000),
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const tags = await response.json()
+  return tags && typeof tags.latest === 'string' ? tags.latest : ''
+}
+
+/** 找到自己的 bundle 条目，判断是软链还是 npm 装的。 */
+async function selfSource(pluginManager, name) {
+  try {
+    const bundles = await pluginManager.listBundles()
+    const own = (Array.isArray(bundles) ? bundles : []).find((b) => b && b.name === name)
+    return own && typeof own.source === 'string' ? own.source : ''
+  } catch {
+    return ''
+  }
+}
+
+async function runSelfUpdate(pluginManager) {
+  const manifest = readManifest(SELF_DIR)
+  const name = manifest && manifest.name
+  const installed = manifest && manifest.version
+  if (!name || !installed) return
+
+  selfUpdateState.checkedAt = Date.now()
+  selfUpdateState.installed = installed
+
+  try {
+    const source = await selfSource(pluginManager, name)
+    if (source.startsWith('link:')) {
+      selfUpdateState.status = 'skipped'
+      selfUpdateState.note = '开发环境（软链安装），跳过自动更新'
+      return
+    }
+    const latest = await fetchPublishedVersion(name)
+    selfUpdateState.latest = latest
+    if (!latest || compareSemver(latest, installed) <= 0) {
+      selfUpdateState.status = 'up-to-date'
+      selfUpdateState.note = ''
+      return
+    }
+    if (typeof pluginManager.updateBundle !== 'function') {
+      selfUpdateState.status = 'skipped'
+      selfUpdateState.note = `发现新版本 ${latest}，但当前 DSH 不支持在插件内更新`
+      return
+    }
+    const answer = await pluginManager.updateBundle(name, latest, { registry: SELF_REGISTRY })
+    const change = answer && answer.result
+    if (change && change.application === 'failed') {
+      selfUpdateState.status = 'failed'
+      selfUpdateState.note = `自动更新到 ${latest} 失败，保持 ${installed} 继续运行`
+      return
+    }
+    selfUpdateState.status = 'updated'
+    selfUpdateState.note = `已更新到 ${latest}，重启 DeepSeek Harness 后生效`
+  } catch (error) {
+    selfUpdateState.status = 'failed'
+    selfUpdateState.note = `检查更新失败：${error instanceof Error ? error.message : String(error)}`
+  }
+}
+
+/** 启动后先等一会儿再查，之后每天一次；effect 释放时清掉定时器。 */
+function scheduleSelfUpdate(pluginManager) {
+  let timer = null
+  let disposed = false
+  const tick = () => {
+    if (disposed) return
+    void runSelfUpdate(pluginManager)
+    timer = setTimeout(tick, SELF_UPDATE_INTERVAL_MS)
+  }
+  timer = setTimeout(tick, SELF_UPDATE_FIRST_DELAY_MS)
+  return () => {
+    disposed = true
+    if (timer) clearTimeout(timer)
+  }
 }
 
 // ── 移动端路由 ────────────────────────────────────────────────
@@ -191,21 +298,112 @@ function resolvePackageDir(name) {
   return null
 }
 
-function readBundleTexts(name) {
-  let description = ''
+/**
+ * 读一个插件的 locale 字典，规则和 DSH 启动时一致：
+ *
+ * 1. 入口是 `locale/en.json`——它不存在就整个不加载（官方就是这么定位的）
+ * 2. 扫描同目录所有 `*.json`，文件名（去掉 .json）就是语言 id
+ * 3. 每个文件取 `meta.title` / `meta.description` / `meta.detail`
+ *
+ * 这样移动端和桌面端看到的是同一份数据，不会出现「桌面中文、手机包名」。
+ */
+function readLocaleDictionaries(dir) {
+  const dicts = new Map()
+  const localeDir = path.join(dir, 'locale')
+  let names
+  try {
+    names = readdirSync(localeDir)
+  } catch {
+    return dicts
+  }
+  // 官方入口缺失时 DSH 根本不读这套文件，这里跟着不读，保持一致
+  if (!names.includes('en.json')) return dicts
+  for (const file of names) {
+    if (!file.endsWith('.json')) continue
+    const language = file.slice(0, -5)
+    if (!/^[a-z]{2,3}(-[a-z0-9]+)*$/i.test(language)) continue
+    try {
+      const parsed = JSON.parse(readFileSync(path.join(localeDir, file), 'utf8'))
+      const meta = parsed && typeof parsed.meta === 'object' && parsed.meta ? parsed.meta : null
+      if (!meta) continue
+      const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '')
+      dicts.set(language.toLowerCase(), {
+        title: text(meta.title),
+        description: text(meta.description),
+        detail: text(meta.detail),
+      })
+    } catch {
+      /* 坏文件：跳过，不影响其它语言 */
+    }
+  }
+  return dicts
+}
+
+/** 按请求语言挑字典：先精确匹配，再按主语言匹配，最后 zh → en。 */
+function pickLanguage(dicts, acceptLanguage) {
+  const wanted = String(acceptLanguage || '')
+    .toLowerCase()
+    .split(',')
+    .map((part) => part.split(';')[0].trim())
+    .filter(Boolean)
+  for (const tag of wanted) {
+    if (dicts.has(tag)) return tag
+    const base = tag.split('-')[0]
+    if (dicts.has(base)) return base
+  }
+  if (dicts.has('zh')) return 'zh'
+  return 'en'
+}
+
+/** 读 meta.detail 指向的文档，限制在包目录内，防止写出路径穿越。 */
+function readDetailFile(dir, relative) {
+  if (!relative) return ''
+  try {
+    const full = path.resolve(dir, relative)
+    const root = path.resolve(dir)
+    if (full !== root && !full.startsWith(root + path.sep)) return ''
+    return firstParagraph(readFileSync(full, 'utf8'))
+  } catch {
+    return ''
+  }
+}
+
+function readBundleTexts(name, acceptLanguage) {
   const dir = resolvePackageDir(name)
-  if (dir === null) return { description, detail: '' }
+  if (dir === null) return { title: '', description: '', detail: '' }
+
+  let manifestName = ''
+  let manifestDescription = ''
   try {
     const pkg = JSON.parse(readFileSync(path.join(dir, 'package.json'), 'utf8'))
-    if (typeof pkg.description === 'string') description = pkg.description.trim()
-  } catch { /* 坏包：留空 */ }
-  let detail = ''
-  try {
-    detail = firstParagraph(readFileSync(path.join(dir, 'README.md'), 'utf8'))
-  } catch { /* 没有 README：留空 */ }
-  // 两者内容重复时只留一份，避免列表里出现两行一样的字
-  if (detail && description && detail.startsWith(description)) detail = detail.slice(description.length).trim()
-  return { description, detail }
+    if (typeof pkg.name === 'string') manifestName = pkg.name.trim()
+    if (typeof pkg.description === 'string') manifestDescription = pkg.description.trim()
+  } catch {
+    /* 坏包：后面全靠 locale */
+  }
+
+  const dicts = readLocaleDictionaries(dir)
+  const language = pickLanguage(dicts, acceptLanguage)
+  const chosen = dicts.get(language) || {}
+  const english = dicts.get('en') || {}
+
+  // 字段顺序和官方一致：当前语言 → en → package.json
+  const title = chosen.title || english.title || manifestName
+  const description = chosen.description || english.description || manifestDescription
+
+  // 长文：meta.detail 指定的文件优先，没有再用 README 第一段
+  let detail = readDetailFile(dir, chosen.detail || english.detail)
+  if (!detail) {
+    try {
+      detail = firstParagraph(readFileSync(path.join(dir, 'README.md'), 'utf8'))
+    } catch {
+      /* 没有 README：留空 */
+    }
+  }
+  if (detail && description && detail.startsWith(description)) {
+    detail = detail.slice(description.length).trim()
+  }
+  return { title, description, detail }
 }
 
 async function collectBundles(pluginManager) {
@@ -359,6 +557,16 @@ function readMobileManifests() {
     }
   } catch { /* node_modules 不可读：返回空列表 */ }
 
+  // **聚合页排第一**：App 目前取 `entries.first` 打开（协议 v1 是「一个按钮 → 一个面板」），
+  // 如果按名字排序，第一个会是 dsh-meeting-memo 之类的具体插件，点「插件」就直接进了它，
+  // 别的插件根本没机会出现。所以固定让 dsh-plugin-panel 的列表页打头，它就是手机端的入口。
+  const AGGREGATOR = 'dsh-plugin-panel'
+  plugins.sort((a, b) => {
+    if (a.module === AGGREGATOR) return -1
+    if (b.module === AGGREGATOR) return 1
+    return a.module.localeCompare(b.module)
+  })
+
   return { plugins, invalid }
 }
 
@@ -370,13 +578,16 @@ function readIfExists(file, fallback) {
   try { return readFileSync(file, 'utf8') } catch { return fallback }
 }
 
-function renderMobilePage(bundles, token, states = new Map()) {
+function renderMobilePage(bundles, token, states = new Map(), acceptLanguage = '') {
   const paths = mobilePaths()
   const items = bundles.map((bundle) => {
     const moduleName = String(bundle.name ?? '')
-    const name = escapeHtml(moduleName)
     const version = escapeHtml(bundle.version ?? '')
-    const { description, detail } = readBundleTexts(moduleName)
+    const { description, detail, title } = readBundleTexts(moduleName, acceptLanguage)
+    // 和桌面端一致：优先 `meta.title`（中文名），没有才退回包名
+    const name = escapeHtml(title || moduleName)
+    // 包名单独给一行小字——排重名、查文档、贴给 AI 都用得上
+    const packageLine = title ? `<div class="pkg">${escapeHtml(moduleName)}</div>` : ''
     const repo = typeof bundle.repo === 'string' ? bundle.repo : ''
     const inline = description ? `<span class="desc">${escapeHtml(description)}</span>` : ''
     // 这个插件有没有移动端页面；有就给它一个「打开」入口，没有就不显示按钮
@@ -388,10 +599,11 @@ function renderMobilePage(bundles, token, states = new Map()) {
     const itemTemplate = readIfExists(
       path.join(SELF_DIR, 'mobile', 'item.html'),
       '<details class="item"><summary><div class="head"><span class="name">{{NAME}}</span>'
-        + '<span class="ver">{{VERSION}}</span></div>{{INLINE}}</summary>{{DETAIL}}</details>',
+        + '<span class="ver">{{VERSION}}</span></div>{{PACKAGE}}{{INLINE}}</summary>{{DETAIL}}</details>',
     )
     return itemTemplate
       .replaceAll('{{NAME}}', name)
+      .replaceAll('{{PACKAGE}}', packageLine)
       .replaceAll('{{VERSION}}', version)
       .replaceAll('{{INLINE}}', inline ? `<div class="inline">${inline}</div>` : '')
       .replaceAll('{{TOGGLE}}', (() => {
@@ -655,7 +867,8 @@ function registerMobile(ctx, services) {
         mobileLog(`page host=${req.headers.host} remote=${req.socket?.remoteAddress}`)
         const bundles = await collectBundles(services.pluginManager)
         const states = await readPluginStates(services.pluginManager)
-        return send(200, renderMobilePage(bundles, token, states), 'text/html; charset=utf-8')
+        const language = String(req.headers['accept-language'] ?? '')
+        return send(200, renderMobilePage(bundles, token, states, language), 'text/html; charset=utf-8')
       }
       // 样式独立成一个文件：调字号配色改 mobile/style.css 再刷新即可，不用重启
       if (url.pathname === `${MOBILE_CHANNEL}/style.css`) {
@@ -715,6 +928,20 @@ function registerDetailRpc(ctx, services) {
         else if (method === 'trend') result = { ok: true, value: await readTrend() }
         else if (method === 'hot') result = { ok: true, value: await readHot() }
         else if (method === 'search') result = { ok: true, value: await readSearch(record.payload) }
+        else if (method === 'remote-search') {
+          const found = await collectRemoteSearch(record.payload)
+          let added = 0
+          if (found && Array.isArray(found.items) && found.items.length) {
+            try {
+              added = rememberRemoteItems(found.items)
+            } catch {
+              /* 写缓存失败不影响这次结果 */
+            }
+          }
+          result = { ok: true, value: { ...found, added } }
+        }
+        else if (method === 'remote-detail') result = { ok: true, value: await collectRemoteDetail(record.payload) }
+        else if (method === 'self-update') result = { ok: true, value: { ...selfUpdateState } }
         else if (method === 'diagnose') {
           const entries = Array.isArray(record.payload && record.payload.plugins) ? record.payload.plugins.length : 0
           writeDiagnoseLog(`diagnose called with ${entries} plugins`)
@@ -859,6 +1086,42 @@ function readHot() {
 function searchCacheFile() {
   const profile = process.env.DSH_PROFILE_DIR || path.join(process.env.HOME || '', '.dsh/profiles/desktop')
   return path.join(profile, '.plugin-panel', 'search-index.json')
+}
+
+/**
+ * 把 npm 上找到的包补进本地索引，下次搜索直接命中本地。
+ *
+ * 只补索引里没有的名字；条目带 fromNpm 标记，分类留空（不参与分类筛选）。
+ * 目录索引重建时会整体覆盖，届时这些条目若已进入新品目录就自然留下。
+ */
+function rememberRemoteItems(items) {
+  const index = readSearchCache()
+  if (!index || !Array.isArray(index.rows) || !index.rows.length) return 0
+  const known = new Set()
+  for (const row of index.rows) if (row && row.name) known.add(row.name)
+  const today = new Date().toISOString().slice(0, 10)
+  const additions = []
+  for (const item of items) {
+    if (!item || typeof item.name !== 'string' || !item.name || known.has(item.name)) continue
+    additions.push({
+      name: item.name,
+      version: item.version || '',
+      category: '',
+      categoryZh: '',
+      summary: item.summary || '',
+      repo: item.repo || '',
+      added: today,
+      publishedAt: item.date || '',
+      stars: null,
+      keywords: Array.isArray(item.keywords) ? item.keywords : [],
+      fromNpm: true,
+    })
+    known.add(item.name)
+  }
+  if (!additions.length) return 0
+  index.rows = index.rows.concat(additions)
+  writeSearchCache(index)
+  return additions.length
 }
 
 function readSearchCache() {
@@ -1165,6 +1428,38 @@ function diagnoseAll(services, payload) {
   return result
 }
 
+/** 量一个包目录的体积：跳过 node_modules 和 .git，符号链接不跟进去。 */
+function measureDirectory(root) {
+  const skip = new Set(['node_modules', '.git'])
+  let bytes = 0
+  let files = 0
+  const walk = (dir, depth) => {
+    if (depth > 8) return
+    let entries
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (skip.has(entry.name)) continue
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(full, depth + 1)
+      } else if (entry.isFile()) {
+        try {
+          bytes += statSync(full).size
+          files += 1
+        } catch {
+          /* 读不到就跳过，不影响其它文件 */
+        }
+      }
+    }
+  }
+  walk(root, 0)
+  return { bytes, files }
+}
+
 function readFacts(payload) {
   const input = payload && typeof payload === 'object' ? payload : {}
   const moduleName = typeof input.moduleName === 'string' ? input.moduleName : ''
@@ -1173,9 +1468,10 @@ function readFacts(payload) {
   const root = (located && located.root) || directoryFromSource(source)
   const manifest = root ? readManifest(root) : null
   const document = root ? readLocalDocument(root) : ''
-  if (!manifest && !document) return { manifest: null, document: '' }
+  if (!manifest && !document) return { manifest: null, document: '', size: null }
   return {
     document,
+    size: root ? measureDirectory(root) : null,
     manifest: manifest && {
       name: manifest.name,
       version: manifest.version,

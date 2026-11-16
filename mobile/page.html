@@ -11,6 +11,212 @@
 <main>{{ITEMS}}</main>
 <p class="note">{{NOTE}}</p>
 {{TOGGLE_SCRIPT}}
+
+<!--
+  插件页面容器：点「打开」不跳走，而是在这一层里加载。
+  这样每个插件都能进去，顶栏一直有「返回插件列表」，回来就是刚才那份列表。
+  仍然保留 href：长按/新窗口打开时还是原地址。
+-->
+<section id="viewer" hidden aria-hidden="true">
+  <div class="viewer-bar">
+    <button type="button" id="viewer-back">← 插件列表</button>
+    <span id="viewer-title"></span>
+  </div>
+  <div class="viewer-stage" id="viewer-stage"></div>
+</section>
+
 <script>window.__MT__ = {{TOKEN_JSON}};</script>
+<script>
+(function () {
+  var viewer = document.getElementById('viewer')
+  var stage = document.getElementById('viewer-stage')
+  var title = document.getElementById('viewer-title')
+  var back = document.getElementById('viewer-back')
+  if (!viewer || !stage || !back) return
+
+  // ── 页面缓存 ──────────────────────────────────────────────
+  // 同一插件第二次进来直接复用上次那个 iframe，不重新加载：
+  // 列表页是常驻的，iframe 只是被隐藏，里面的滚动位置、展开状态、任务列表都还在。
+  // 代价是数据可能是旧的，所以给一个存活时间；过期就丢掉重建。
+  // ── 上次位置 ──────────────────────────────────────────────
+  // App 每次打开面板都会新建一个 WebView，页面是重新加载的。
+  // 把「上次停在哪」记在 localStorage 里，下次进来先恢复它，
+  // 而不是每次都从插件列表开始。按「返回」回到列表时也会记下来，
+  // 所以「停在列表」这个状态同样会被保留。
+  var LAST_VIEW_KEY = 'dsh.mobile.lastView'
+
+  function saveLastView(view) {
+    try { localStorage.setItem(LAST_VIEW_KEY, JSON.stringify(view || {})) } catch (e) { /* 隐私模式等，忽略 */ }
+  }
+
+  function readLastView() {
+    try {
+      var raw = localStorage.getItem(LAST_VIEW_KEY)
+      if (!raw) return null
+      var parsed = JSON.parse(raw)
+      return parsed && typeof parsed.path === 'string' && parsed.path ? parsed : null
+    } catch (e) { return null }
+  }
+
+  var CACHE_TTL_MS = 2 * 60 * 1000
+  var CACHE_MAX = 3
+  var cache = new Map()   // key(不带 mt) -> { frame, at }，只留最近用的 3 个
+
+  function keyOf(href) {
+    var url = new URL(href, location.href)
+    return url.pathname
+  }
+
+  function evictOldest() {
+    if (cache.size <= CACHE_MAX) return
+    var oldestKey = null
+    var oldestAt = Infinity
+    cache.forEach(function (entry, key) {
+      if (entry.at < oldestAt) { oldestAt = entry.at; oldestKey = key }
+    })
+    if (oldestKey) {
+      var entry = cache.get(oldestKey)
+      if (entry && entry.frame) entry.frame.remove()
+      cache.delete(oldestKey)
+    }
+  }
+
+  function forget(key) {
+    var entry = cache.get(key)
+    if (!entry) return
+    if (entry.frame) entry.frame.remove()
+    cache.delete(key)
+  }
+
+  function makeFrame(href) {
+    var frame = document.createElement('iframe')
+    frame.className = 'viewer-page'
+    frame.setAttribute('title', '插件页面')
+    frame.setAttribute('allow', 'camera; microphone; fullscreen')
+    frame.src = href
+    return frame
+  }
+
+  function close() {
+    saveLastView({ path: '' })
+    viewer.hidden = true
+    viewer.setAttribute('aria-hidden', 'true')
+    title.textContent = ''
+    document.body.classList.remove('viewing')
+    postViewerState(false)
+  }
+
+  // 原生导航栏的返回按钮调这个
+  window.__dshCloseViewer = close
+
+  // 页面打开时带的 token 只有 5 分钟有效。挂久了再点插件会 401，
+  // 所以超过 4 分钟就换一个新的再打开（换 token 有 10 次/分钟的上限，不能每次都换）。
+  var loadedAt = Date.now()
+  var TOKEN_FRESH_MS = 4 * 60 * 1000
+
+  function withFreshToken(href) {
+    if (Date.now() - loadedAt < TOKEN_FRESH_MS) return Promise.resolve(href)
+    return fetch('/dsh-plugin-panel/mobile/token', { method: 'POST' })
+      .then(function (res) { return res.ok ? res.json() : null })
+      .then(function (data) {
+        if (!data || !data.token) return href
+        var url = new URL(href, location.href)
+        url.searchParams.set('mt', data.token)
+        loadedAt = Date.now()
+        return url.pathname + url.search
+      })
+      .catch(function () { return href })
+  }
+
+  // App 注入过这个标记就说明导航栏已经有「返回插件列表」，页面不用再画一条
+  var NATIVE_BAR = !!window.__DSH_NATIVE_VIEWER__
+  if (NATIVE_BAR) document.body.classList.add('has-native-bar')
+
+  // 告诉原生「现在在插件页里 / 已经回到列表」，导航栏据此显示或收起返回按钮
+  function postViewerState(open) {
+    try {
+      var handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.viewerState
+      if (handler) handler.postMessage({ open: !!open })
+    } catch (e) { /* 老版本 App 没有这条通道，忽略 */ }
+  }
+
+  function show(key, name) {
+    cache.forEach(function (entry, k) {
+      var active = k === key
+      entry.frame.hidden = !active
+      entry.frame.classList.toggle('is-active', active)
+    })
+    title.textContent = name || ''
+    viewer.hidden = false
+    viewer.setAttribute('aria-hidden', 'false')
+    document.body.classList.add('viewing')
+    postViewerState(true)
+    saveLastView({ path: key, name: name || '' })
+  }
+
+  function open(href, name, force) {
+    var key = keyOf(href)
+    var now = Date.now()
+    var hit = cache.get(key)
+
+    // 命中且没过期：一个请求都不发，直接显示上次那个页面
+    if (hit && !force && now - hit.at < CACHE_TTL_MS) {
+      hit.at = now
+      show(key, name)
+      return
+    }
+
+    forget(key)
+    // 先拿可能在期外的 token 再建 iframe，避免「先加载一次再换地址」的双重请求
+    withFreshToken(href).then(function (src) {
+      var frame = makeFrame(src)
+      stage.appendChild(frame)
+      cache.set(key, { frame: frame, at: Date.now() })
+      evictOldest()
+      show(key, name)
+    })
+  }
+
+  back.addEventListener('click', close)
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && !viewer.hidden) close()
+  })
+
+  document.addEventListener('click', function (event) {
+    var link = event.target && event.target.closest ? event.target.closest('a.open') : null
+    if (!link) return
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+    var item = link.closest('.item')
+    var nameEl = item ? item.querySelector('.name') : null
+    event.preventDefault()
+    open(link.getAttribute('href'), nameEl ? nameEl.textContent : '', false)
+  })
+
+  // 恢复上次位置：停在插件页就回到那个插件，停在列表就保持列表
+  ;(function restoreLastView() {
+    var last = readLastView()
+    if (!last) return
+    var links = document.querySelectorAll('a.open')
+    for (var i = 0; i < links.length; i += 1) {
+      var href = links[i].getAttribute('href') || ''
+      if (keyOf(href) !== last.path) continue
+      var item = links[i].closest('.item')
+      var nameEl = item ? item.querySelector('.name') : null
+      open(href, last.name || (nameEl ? nameEl.textContent : ''), false)
+      return
+    }
+  })()
+
+  // 长按「打开」= 丢掉缓存强制重载（数据变了想立刻看到时用）
+  document.addEventListener('contextmenu', function (event) {
+    var link = event.target && event.target.closest ? event.target.closest('a.open') : null
+    if (!link) return
+    event.preventDefault()
+    var item = link.closest('.item')
+    var nameEl = item ? item.querySelector('.name') : null
+    open(link.getAttribute('href'), nameEl ? nameEl.textContent : '', true)
+  })
+})()
+</script>
 </body>
 </html>

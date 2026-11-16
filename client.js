@@ -15,6 +15,7 @@ window.__ModuleLoader__.load({
         'guide.title': '插件管理',
         'guide.description': '查看并打开右侧栏插件。',
         'list.installed': '用户安装',
+        'list.installedAll': '已安装插件',
         'list.builtin': '系统内置',
         'list.refresh': '刷新',
         'list.market': '插件市场',
@@ -30,6 +31,17 @@ window.__ModuleLoader__.load({
         'list.aboutLicense': '许可',
         'list.aboutRepo': '仓库',
         'list.aboutData': '数据位置',
+        'list.aboutAuto': '更新',
+        'list.aboutAutoBody': '插件每天自己查一次 npm，有新版本就直接装上，装完提示重启 DeepSeek Harness。从源码软链安装的开发环境不会自动更新（否则会覆盖正在改的代码）。',
+        'list.aboutTabs': '每个页签做什么',
+        'list.aboutTabPlugins': '已安装插件',
+        'list.aboutTabPluginsBody': '所有装了的东西都在这里，包括 DSH 自带的系统插件。每行标出它的入口在哪（右侧栏、设置页、左侧菜单，或者没有界面），可以置顶、开关、移除；缺元信息的会标一个「建议 N」，点一下复制体检报告。',
+        'list.aboutTabMarket': '插件市场',
+        'list.aboutTabMarketBody': '整个插件目录：增长趋势图、最近 7 天增长榜、支持中文的全库搜索，还有按分类筛选和一键装卸。本地索引没收录的包，会去 npm 实时查一次——刚发布的插件通常就卡在这里。',
+        'list.aboutTabFeatured': '精选推荐',
+        'list.aboutTabFeaturedBody': '人工挑的，数量少是有意的。收录标准只有一条：自己装过、用过，确认它解决了真问题。每一条都写清「为什么值得装」，不复述插件自己的介绍。',
+        'list.aboutTabDesign': '设计规范',
+        'list.aboutTabDesignBody': '给插件开发者的规范文本，按场景分三段：骨架与元信息（命名、清单、locale、图标、关于页）、视觉设计（颜色、边框、图标尺寸、图表）、移动端接入。每段都能单独复制，粘给任意 AI 让它照着改。里面所有颜色变量名都对着 DSH 实际样式表核对过——这一点很关键，写错名字不会报错，只是颜色静默失效。',
         'list.aboutShare': '分享给别人',
         'list.aboutShareHint': '把下面这段整段复制，发给任意一个能操作电脑的 AI，它就能自己把插件装上。',
         'list.aboutCopy': '复制这段话',
@@ -81,6 +93,16 @@ window.__ModuleLoader__.load({
         'list.categoryProvider': '模型接入',
         'list.categoryTheme': '主题',
         'list.categoryOther': '其他',
+        'list.remoteSearching': '本地索引没有，正在查 npm…',
+        'list.remoteHits': '本地索引没有收录，npm 上有 {n} 个',
+        'list.remoteHint': '这些包比本地索引新，通常是刚发布不久。装完重启 DSH 生效。搜不到时可以粘贴完整包名，带 @ 作者名的那种最准。',
+        'list.remoteEmpty': '本地索引和 npm 上都没有找到这个包',
+        'list.remoteSaved': '已写入本地索引 {n} 条，下次搜索直接从本地命中',
+        'list.remoteError': '查 npm 时出错了，可能是网络问题',
+        'list.remoteSource': 'npm（本地索引还没收录）',
+        'list.size': '体积',
+        'list.sizeUnpacked': '体积（解压后）',
+        'list.fileCount': '{n} 个文件',
         'list.marketHits': '找到 {n} 个',
         'list.sortHot': '最热',
         'list.sortNew': '最新',
@@ -173,6 +195,7 @@ window.__ModuleLoader__.load({
         'guide.title': 'Plugin manager',
         'guide.description': 'Browse and open right-sidebar plugins.',
         'list.installed': 'Installed',
+        'list.installedAll': 'Plugins',
         'list.builtin': 'Built-in',
         'list.refresh': 'Refresh',
         'list.market': 'Plugin market',
@@ -188,6 +211,17 @@ window.__ModuleLoader__.load({
         'list.aboutLicense': 'License',
         'list.aboutRepo': 'Repository',
         'list.aboutData': 'Data',
+        'list.aboutAuto': 'Updates',
+        'list.aboutAutoBody': 'The plugin checks npm once a day and installs a newer version by itself, then asks for a restart. A source checkout installed by link is never auto-updated, so local work is not overwritten.',
+        'list.aboutTabs': 'What each tab does',
+        'list.aboutTabPlugins': 'Installed',
+        'list.aboutTabPluginsBody': 'Everything installed, DSH built-ins included. Each row shows where it lives (right sidebar, settings, left menu, or no UI) and can be pinned, toggled or removed. Missing metadata shows a "suggestion N" badge you can tap to copy a report.',
+        'list.aboutTabMarket': 'Market',
+        'list.aboutTabMarketBody': 'The whole catalog: growth chart, 7-day ranking, Chinese-friendly full-text search, category filters, one-click install. Packages missing from the local index are looked up on npm on the fly — which is where freshly published plugins live.',
+        'list.aboutTabFeatured': 'Featured',
+        'list.aboutTabFeaturedBody': 'Hand-picked and deliberately few. One rule: installed and actually used before being listed. Each entry says why it is worth installing instead of repeating the plugin own description.',
+        'list.aboutTabDesign': 'Design spec',
+        'list.aboutTabDesignBody': 'Rules for plugin authors in three scenarios: skeleton and metadata (naming, manifest, locale, icon, About tab), visual design (colour, borders, icon sizes, charts), mobile. Each section can be copied on its own and handed to any AI. Every colour token name is verified against the real DSH stylesheet — a wrong name fails silently rather than erroring.',
         'list.aboutShare': 'Share it',
         'list.aboutShareHint': 'Copy the whole block below and hand it to any computer-operating AI; it can install the plugin by itself.',
         'list.aboutCopy': 'Copy this',
@@ -239,6 +273,16 @@ window.__ModuleLoader__.load({
         'list.categoryProvider': 'Providers',
         'list.categoryTheme': 'Themes',
         'list.categoryOther': 'Other',
+        'list.remoteSearching': 'Not in the local index — asking npm…',
+        'list.remoteHits': 'Not in the local index, but npm has {n}',
+        'list.remoteHint': 'These were published after the local index snapshot. Restart DSH after installing. Paste the full package name (with its @scope) for an exact hit.',
+        'list.remoteEmpty': 'Not found in the local index or on npm',
+        'list.remoteSaved': 'Saved {n} to the local index — the next search hits it locally',
+        'list.remoteError': 'npm lookup failed — probably a network problem',
+        'list.remoteSource': 'npm (not in the local index yet)',
+        'list.size': 'Size',
+        'list.sizeUnpacked': 'Size (unpacked)',
+        'list.fileCount': '{n} files',
         'list.marketHits': '{n} found',
         'list.sortHot': 'Popular',
         'list.sortNew': 'Newest',
@@ -638,8 +682,12 @@ window.__ModuleLoader__.load({
       const lines = String(source || '').replace(/\r\n/g, '\n').split('\n')
       const blocks = []
       let list = null
+      let ordered = null
       let paragraph = []
       let table = null
+      let code = null
+      let quote = null
+
       const flushParagraph = () => {
         if (!paragraph.length) return
         blocks.push(h('p', { key: `p-${blocks.length}` }, inlineMarkdown(paragraph.join(' '))))
@@ -650,47 +698,117 @@ window.__ModuleLoader__.load({
         blocks.push(h('ul', { key: `ul-${blocks.length}` }, list.map((item, index) => h('li', { key: index }, inlineMarkdown(item)))))
         list = null
       }
+      const flushOrdered = () => {
+        if (!ordered) return
+        blocks.push(h('ol', { key: `ol-${blocks.length}` }, ordered.map((item, index) => h('li', { key: index }, inlineMarkdown(item)))))
+        ordered = null
+      }
       const flushTable = () => {
         if (!table) return
         const node = renderTable(table)
         if (node) blocks.push(h('div', { key: `table-${blocks.length}` }, node))
         table = null
       }
+      const flushCode = () => {
+        if (!code) return
+        blocks.push(h('pre', { key: `code-${blocks.length}`, className: 'dsh-pl-md-code' },
+          h('code', null, code.lines.join('\n'))))
+        code = null
+      }
+      const flushQuote = () => {
+        if (!quote) return
+        blocks.push(h('blockquote', { key: `q-${blocks.length}` }, inlineMarkdown(quote.join(' '))))
+        quote = null
+      }
+      const flushAll = () => {
+        flushParagraph()
+        flushList()
+        flushOrdered()
+        flushTable()
+      }
+
       lines.forEach((line) => {
         const trimmed = line.trim()
+
+        // 代码块：``` 开头和结尾配对，中间原样保留（表格、列表、缩进都不动）
+        const fence = /^```([a-zA-Z0-9+#-]*)\s*$/.exec(trimmed)
+        if (fence) {
+          if (code === null) {
+            flushAll()
+            code = { lang: fence[1] || '', lines: [] }
+          } else {
+            flushCode()
+          }
+          return
+        }
+        if (code !== null) {
+          code.lines.push(line)
+          return
+        }
+
         if (isTableRow(trimmed)) {
           flushParagraph()
           flushList()
+          flushOrdered()
           table = table || []
           table.push(trimmed)
           return
         }
         flushTable()
         if (!trimmed || trimmed.startsWith('![')) {
-          flushParagraph()
-          flushList()
+          flushAll()
+          flushQuote()
           return
         }
-        const heading = /^(#{1,4})\s+(.*)$/.exec(trimmed)
-        if (heading) {
+        const quoted = /^>\s?(.*)$/.exec(trimmed)
+        if (quoted) {
           flushParagraph()
           flushList()
+          flushOrdered()
+          flushTable()
+          quote = quote || []
+          quote.push(quoted[1])
+          return
+        }
+        flushQuote()
+        const heading = /^(#{1,4})\s+(.*)$/.exec(trimmed)
+        if (heading) {
+          flushAll()
           blocks.push(h(heading[1].length <= 2 ? 'h3' : 'h4', { key: `h-${blocks.length}`, className: 'dsh-pl-md-h' }, inlineMarkdown(heading[2])))
+          return
+        }
+        // 复选框：- [ ] / - [x] 画成方框，比原样显示 "[ ]" 好读
+        const checkbox = /^[-*]\s+\[([ xX])\]\s+(.*)$/.exec(trimmed)
+        if (checkbox) {
+          flushParagraph()
+          flushOrdered()
+          list = list || []
+          list.push(`${checkbox[1].trim() ? '☑' : '☐'} ${checkbox[2]}`)
           return
         }
         const item = /^[-*]\s+(.*)$/.exec(trimmed)
         if (item) {
           flushParagraph()
+          flushOrdered()
           list = list || []
           list.push(item[1])
           return
         }
+        const numbered = /^(\d+)\.\s+(.*)$/.exec(trimmed)
+        if (numbered) {
+          flushParagraph()
+          flushList()
+          ordered = ordered || []
+          ordered.push(numbered[2])
+          return
+        }
         flushList()
+        flushOrdered()
         paragraph.push(trimmed.replace(/^>\s?/, ''))
       })
-      flushParagraph()
-      flushList()
-      flushTable()
+      flushAll()
+      flushCode()
+      flushQuote()
       return h('div', { className: 'dsh-pl-md' }, blocks)
     }
 
@@ -780,8 +898,36 @@ window.__ModuleLoader__.load({
     }
 
     /** Turn a repository field into a link, tolerating the shapes npm allows. */
+    /** 字节数转成人看的大小；0 或非法值返回空串。 */
+    function formatBytes(bytes) {
+      const n = Number(bytes) || 0
+      if (n <= 0) return ''
+      if (n >= 1048576) return `${(n / 1048576).toFixed(n >= 10485760 ? 0 : 1)} MB`
+      if (n >= 1024) return `${Math.round(n / 1024)} KB`
+      return `${n} B`
+    }
+
+    /** 「1.2 MB · 14 个文件」这样的组合文案。 */
+    function formatSize(bytes, files, t) {
+      const size = formatBytes(bytes)
+      if (!size) return ''
+      const count = Number(files) || 0
+      return count > 0 ? `${size} · ${textOf(t, 'list.fileCount').replace('{n}', String(count))}` : size
+    }
+
+    /**
+     * 仓库链接。接受字符串，也接受 package.json 的 repository 对象——
+     * monorepo 里的 `directory` 会带到链接上，否则点进去只是仓库根。
+     */
     function repoLinkOf(value) {
-      const text = String(value || '').trim()
+      let text = ''
+      let directory = ''
+      if (value && typeof value === 'object') {
+        text = typeof value.url === 'string' ? value.url.trim() : ''
+        directory = typeof value.directory === 'string' ? value.directory.replace(/^[./\s]+|[./\s]+$/g, '') : ''
+      } else {
+        text = String(value || '').trim()
+      }
       if (!text) return text
       let url = ''
       if (/^git\+https?:\/\//i.test(text)) url = text.replace(/^git\+/, '')
@@ -790,13 +936,15 @@ window.__ModuleLoader__.load({
       else if (/^[\w.-]+\/[\w.-]+$/.test(text)) url = `https://github.com/${text}`
       if (!url) return text
       const href = url.replace(/\.git$/, '')
+      // 有子目录就显示 owner/repo/dir，链接也指到那个目录；否则沿用原来的文本
+      const label = directory ? `${href.replace(/^https?:\/\/github\.com\//i, '')}/${directory}` : text.replace(/^git\+/, '')
       return h('a', {
         className: 'dsh-pl-link',
-        href,
+        href: directory ? `${href}/tree/HEAD/${directory}` : href,
         target: '_blank',
         rel: 'noreferrer noopener',
         onClick: (event) => event.stopPropagation(),
-      }, text.replace(/^git\+/, ''))
+      }, label)
     }
 
     /**
@@ -812,128 +960,251 @@ window.__ModuleLoader__.load({
      * B 视觉：纯样式，颜色/间距/图标/图表。
      * C 元信息修正：给已经做好的插件逐条对齐，面向体检结果。
      */
-    const SPEC_NEW = [
-      '# DSH 插件 · 新建清单',
-      '',
-      '从零做到「装上能被正确显示」。按顺序走，走完就能装。',
-      '',
-      '## 一、先定名字',
-      '',
-      '四个名字必须能互相对上：',
-      '',
-      '| 名字 | 写在哪 | 例子 |',
-      '| --- | --- | --- |',
-      '| 中文名 | `locale/zh.json` → `meta.title` | `插件管理` |',
-      '| 英文名 | `locale/en.json` → `meta.title` | `Plugin manager` |',
-      '| 包名 | `package.json` → `name` | `dsh-plugin-panel` |',
-      '| 行标识 | `cordis.patch.yml` → `id` | `dsh-plugin-panel` |',
-      '',
-      '- 中文名 **2–6 字**，名词短语，说「做什么」。不要版本号、不要「测试」后缀',
-      '- 包名全小写 + 连字符，`dsh-` 开头',
-      '- **行标识写包名，不要写相对路径**（`./lib/index.js` 会让宿主读不到 locale，面板永远显示英文名）',
-      '',
-      '## 二、目录骨架',
-      '',
-      '```',
-      'my-plugin/',
-      '├── package.json          清单：入口、dsh 字段、files',
-      '├── cordis.patch.yml      加载行',
-      '├── icon.svg              图标，24×24 描边',
-      '├── locale/',
-      '│   ├── zh.json           meta.title / description / detail',
-      '│   └── en.json',
-      '├── docs/',
-      '│   └── DETAIL.zh.md      详情长文（可被 meta.detail 指向）',
-      '├── src/',
-      '│   ├── index.ts          host 半片：工具、RPC',
-      '│   └── client/           client 半片：面板界面',
-      '└── lib/                  构建产物（不要手改）',
-      '```',
-      '',
-      '## 三、package.json 最小必需',
-      '',
-      '```json',
-      '{',
-      '  "name": "dsh-my-plugin",',
-      '  "version": "0.1.0",',
-      '  "description": "One line in English for npm.",',
-      '  "keywords": ["dsh", "deepseek-harness", "dsh-plugin", "中文关键词"],',
-      '  "exports": {',
-      '    ".": "./lib/index.js",',
-      '    "./client": "./lib/client.js",',
-      '    "./icon": "./icon.svg",',
-      '    "./locale/*.json": "./locale/*.json"',
-      '  },',
-      '  "files": ["lib", "locale/*.json", "icon.svg", "cordis.patch.yml", "docs"],',
-      '  "dsh": {',
-      '    "bundle": { "patch": "./cordis.patch.yml" },',
-      '    "client": {',
-      '      "platform": "web",',
-      '      "inject": ["@deepseek-ai/dsh-client-ui-sidebar-right", "@deepseek-ai/dsh-client-locale"]',
-      '    }',
-      '  }',
-      '}',
-      '```',
-      '',
-      '要点：',
-      '',
-      '- `exports["./icon"]` 必须声明，光有 `icon.svg` 文件不算',
-      '- `files` 必须含 `locale/*.json` 和 `icon.svg`，否则别人装了看不到',
-      '- `dsh.client.inject` 只列代码里真正用到的客户端服务',
-      '- `keywords` 必须有一个中文词',
-      '',
-      '## 四、cordis.patch.yml',
-      '',
-      '```yaml',
-      '- insert:',
-      '    - id: dsh-my-plugin',
-      '      name: dsh-my-plugin',
-      '```',
-      '',
-      '`id` 和 `name` 都写包名。写相对路径会导致 locale 读不到。',
-      '',
-      '## 五、locale 三件套',
-      '',
-      '```json',
-      '{ "meta": {',
-      '    "title": "我的插件",',
-      '    "description": "一句话说清它做什么。",',
-      '    "detail": "docs/DETAIL.zh.md"',
-      '} }',
-      '',
-      '```',
-      '',
-      '- `meta.detail` 相对**包根**解析，不是相对 `locale/`',
-      '- 它指向的文件必须进 `files`',
-      '- `en.json` 结构相同，填英文',
-      '',
-      '## 六、图标',
-      '',
-      '```svg',
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"',
-      '     fill="none" stroke="currentColor" stroke-width="1.8"',
-      '     stroke-linecap="round" stroke-linejoin="round">',
-      '  <!-- 2-4 条 path，留白要够 -->',
-      '</svg>',
-      '```',
-      '',
-      '单色描边、`currentColor`、24×24。细节多了在 24px 下会糊。',
-      '',
-      '## 七、装上前自检',
-      '',
-      '```bash',
-      'npm run build',
-      'dsh插件开发经验/scripts/check-plugin-meta.sh   你的目录',
-      'dsh插件开发经验/scripts/check-plugin-health.sh 你的目录',
-      '```',
-      '',
-      '- [ ] 中文名 2–6 字，包名 kebab-case，两者能关联',
-      '- [ ] `cordis.patch.yml` 的 `id`/`name` 都是包名',
-      '- [ ] `exports["./icon"]` 已声明',
-      '- [ ] `files` 含 `locale/*.json` 与 `icon.svg`',
-      '- [ ] `locale/zh.json` 三件套齐全，`detail` 文件存在',
-      '- [ ] `dsh.bundle.patch` 指向的文件存在',
-      '- [ ] 两个自检脚本都通过',
+    const SPEC_SKELETON = [
+      "# 插件骨架与元信息",
+      "",
+      "给一个插件定名字、摆目录、配清单、写 locale、做图标、加关于页。",
+      "**新建插件**按顺序走一遍；**已经有插件**的直接跳到第八节，按体检结果逐条对齐。",
+      "两边用的是同一套字段，所以只写一遍。",
+      "",
+      "## 一、先定名字",
+      "",
+      "四个名字必须能互相对上：",
+      "",
+      "| 名字 | 写在哪 | 例子 |",
+      "| --- | --- | --- |",
+      "| 中文名 | `locale/zh.json` → `meta.title` | `插件管理` |",
+      "| 英文名 | `locale/en.json` → `meta.title` | `Plugin manager` |",
+      "| 包名 | `package.json` → `name` | `dsh-plugin-panel` |",
+      "| 行标识 | `cordis.patch.yml` → `id` | `dsh-plugin-panel` |",
+      "",
+      "- 中文名 **2–6 字**，名词短语，说「做什么」。不要版本号、不要「测试」后缀",
+      "- 包名全小写 + 连字符，`dsh-` 开头",
+      "- **行标识写包名，不要写相对路径**（`./lib/index.js` 会让宿主读不到 locale，面板永远显示英文名）",
+      "",
+      "",
+      "## 二、目录骨架",
+      "",
+      "```",
+      "my-plugin/",
+      "├── package.json          清单：入口、dsh 字段、files",
+      "├── cordis.patch.yml      加载行",
+      "├── icon.svg              图标，24×24 描边",
+      "├── locale/",
+      "│   ├── zh.json           meta.title / description / detail",
+      "│   └── en.json",
+      "├── docs/",
+      "│   └── DETAIL.zh.md      详情长文（可被 meta.detail 指向）",
+      "├── src/",
+      "│   ├── index.ts          host 半片：工具、RPC",
+      "│   └── client/           client 半片：面板界面",
+      "└── lib/                  构建产物（不要手改）",
+      "```",
+      "",
+      "",
+      "## 三、package.json 最小必需",
+      "",
+      "```json",
+      "{",
+      "  \"name\": \"dsh-my-plugin\",",
+      "  \"version\": \"0.1.0\",",
+      "  \"description\": \"One line in English for npm.\",",
+      "  \"keywords\": [\"dsh\", \"deepseek-harness\", \"dsh-plugin\", \"中文关键词\"],",
+      "  \"exports\": {",
+      "    \".\": \"./lib/index.js\",",
+      "    \"./client\": \"./lib/client.js\",",
+      "    \"./icon\": \"./icon.svg\",",
+      "    \"./locale/*.json\": \"./locale/*.json\"",
+      "  },",
+      "  \"files\": [\"lib\", \"locale/*.json\", \"icon.svg\", \"cordis.patch.yml\", \"docs\"],",
+      "  \"dsh\": {",
+      "    \"bundle\": { \"patch\": \"./cordis.patch.yml\" },",
+      "    \"client\": {",
+      "      \"platform\": \"web\",",
+      "      \"inject\": [\"@deepseek-ai/dsh-client-ui-sidebar-right\", \"@deepseek-ai/dsh-client-locale\"]",
+      "    }",
+      "  }",
+      "}",
+      "```",
+      "",
+      "要点：",
+      "",
+      "- `exports[\"./icon\"]` 必须声明，光有 `icon.svg` 文件不算",
+      "- `files` 必须含 `locale/*.json` 和 `icon.svg`，否则别人装了看不到",
+      "- `dsh.client.inject` 只列代码里真正用到的客户端服务",
+      "- `keywords` 必须有一个中文词",
+      "",
+      "",
+      "## 四、cordis.patch.yml",
+      "",
+      "```yaml",
+      "- insert:",
+      "    - id: dsh-my-plugin",
+      "      name: dsh-my-plugin",
+      "```",
+      "",
+      "`id` 和 `name` 都写包名。写相对路径会导致 locale 读不到。",
+      "",
+      "",
+      "## 五、locale 三件套",
+      "",
+      "```json",
+      "{ \"meta\": {",
+      "    \"title\": \"我的插件\",",
+      "    \"description\": \"一句话说清它做什么。\",",
+      "    \"detail\": \"docs/DETAIL.zh.md\"",
+      "} }",
+      "",
+      "```",
+      "",
+      "- `meta.detail` 相对**包根**解析，不是相对 `locale/`",
+      "- 它指向的文件必须进 `files`",
+      "- `en.json` 结构相同，填英文",
+      "",
+      "",
+      "## 六、图标",
+      "",
+      "```svg",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"",
+      "     fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"",
+      "     stroke-linecap=\"round\" stroke-linejoin=\"round\">",
+      "  <!-- 2-4 条 path，留白要够 -->",
+      "</svg>",
+      "```",
+      "",
+      "单色描边、`currentColor`、24×24。细节多了在 24px 下会糊。",
+      "",
+      "",
+      "## 七、关于页：每个插件都该有一个",
+      "",
+      "插件面板最右边放一个「关于」页，回答三个问题：**你是什么、装了会怎样、怎么分享给别人**。",
+      "参照实现就是插件管理自己那个「关于」页，照抄结构即可。",
+      "",
+      "### 1. 这个插件做什么（两到三段）",
+      "",
+      "说清「解决什么问题」，不要罗列功能点。一段讲它替代了什么麻烦，一段讲它怎么工作，",
+      "如果涉及隐私（本地录音、本地转写、不上传云端），单独一句点明——这是用户最关心的。",
+      "",
+      "### 2. 基本信息（一项一行）",
+      "",
+      "| 字段 | 内容 |",
+      "| --- | --- |",
+      "| 包名 | `dsh-my-plugin` |",
+      "| 版本 | 从代码里的常量取，不要手写（发布时忘了改就会对不上） |",
+      "| 许可 | `MIT` 之类 |",
+      "| 仓库 | `github.com/owner/repo`，monorepo 要带子目录 |",
+      "| 数据位置 | 插件在用户盘上写东西的地方，比如 `~/.dsh/profiles/<profile>/.plugin-panel` |",
+      "",
+      "### 3. 分享给别人",
+      "",
+      "一段可整段复制的文字，让任何 AI 能自己把插件装上。至少包含：",
+      "",
+      "- 包名、中文名、版本",
+      "- 它是干什么的（一句话）",
+      "- 按顺序的步骤：确认 profile → `dsh plugin --profile <p> add <包名>` → 重启 DSH",
+      "- **兜底约束**：「如果 npm 上取不到这个包，说明还没发布，请直接告诉我，不要自己改写依赖或装同名的其它包」",
+      "",
+      "最后那条是重点。AI 拿不到包时最常见的两种跑偏：自己改版本号、去找相似名字的包。",
+      "",
+      "### 4. 两个细节",
+      "",
+      "- 复制按钮给一句确认提示（「安装说明已复制」），别复制完毫无反应",
+      "- 版本号读代码里的常量，不要在两处各写一遍",
+      "",
+      "",
+      "## 八、已有插件怎么对齐",
+      "",
+      "### 先跑体检，看缺什么",
+      "",
+      "```bash",
+      "dsh插件开发经验/scripts/check-plugin-meta.sh 你的插件目录",
+      "```",
+      "",
+      "面板里每个插件卡片上也有健康度标签，点一下会复制该插件的完整报告。",
+      "",
+      "",
+      "### 七项对照表",
+      "",
+      "| 要控制的 | 写在哪 | 缺了会怎样 |",
+      "| --- | --- | --- |",
+      "| 卡片名字 | `locale/zh.json` → `meta.title` | 显示包名 |",
+      "| 一句话说明 | `meta.description` | 副标题空白 |",
+      "| 详情长文 | `meta.detail` | 回落读 README |",
+      "| 图标 | `package.json` → `exports[\"./icon\"]` | 显示默认灰方块 |",
+      "| 能否加载 | `dsh.bundle.patch` | 装了不出现 |",
+      "| 客户端服务 | `dsh.client.inject` | 运行时报 undefined |",
+      "| 打包完整 | `files` | 用户装了看不到图标和中文名 |",
+      "",
+      "",
+      "### 四种常见修法",
+      "",
+      "#### 1. 面板显示英文包名",
+      "",
+      "两个原因，都可能同时存在：",
+      "",
+      "**a) 缺 locale**",
+      "",
+      "```json",
+      "// locale/zh.json",
+      "{ \"meta\": { \"title\": \"中文名\", \"description\": \"一句话\" } }",
+      "```",
+      "",
+      "**b) `cordis.patch.yml` 的 `name` 写了相对路径**",
+      "",
+      "```yaml",
+      "# 错：宿主按相对路径找不到包根，读不到 locale",
+      "      name: ./lib/index.js",
+      "# 对：写包名",
+      "      name: dsh-my-plugin",
+      "```",
+      "",
+      "改完要重新构建并重启 DSH。",
+      "",
+      "#### 2. 图标是灰方块",
+      "",
+      "```json",
+      "\"exports\": { \"./icon\": \"./icon.svg\" },",
+      "\"files\": [\"icon.svg\", \"locale/*.json\"]",
+      "```",
+      "",
+      "光有 `icon.svg` 文件但不在 `exports` 里，等于没配。图标规格：24×24、`fill=\"none\"`、`stroke=\"currentColor\"`、`stroke-width=\"1.8\"`。",
+      "",
+      "#### 3. 详情页空白",
+      "",
+      "- `meta.detail` 指向的文件不存在 → 创建它",
+      "- 或者干脆不写 `meta.detail`，回落读 README 也是允许的",
+      "- 写了就要保证它进了 `files`",
+      "",
+      "#### 4. 中文搜不到",
+      "",
+      "`keywords` 里加中文词，至少一个：",
+      "",
+      "```json",
+      "\"keywords\": [\"dsh\", \"deepseek-harness\", \"dsh-plugin\", \"插件管理\"]",
+      "```",
+      "",
+      "",
+      "### 只对界面插件要求的部分",
+      "",
+      "纯 host 插件（没有 `dsh.client`）不显示图标、不渲染标题，**不要求** locale 和图标。系统内置的 host 插件大多没有这些，不是缺陷。",
+      "",
+      "",
+      "## 九、交付前自检",
+      "",
+      "- [ ] 中文名 2–6 字，包名 kebab-case，两者能关联",
+      "- [ ] `cordis.patch.yml` 的 `id`/`name` 都是包名",
+      "- [ ] `exports[\"./icon\"]` 已声明",
+      "- [ ] `files` 含 `locale/*.json` 与 `icon.svg`",
+      "- [ ] `locale/zh.json` 三件套齐全，`detail` 文件存在",
+      "- [ ] `dsh.bundle.patch` 指向的文件存在",
+      "- [ ] 有「关于」页：介绍、基本信息、可复制的分享说明",
+      "- [ ] 两个自检脚本都通过",
+      "- [ ] 面板卡片显示中文名，不是包名",
+      "- [ ] 有图标，不是灰方块",
+      "- [ ] 详情页有内容",
+      "- [ ] 中文能搜到",
+      "- [ ] `check-plugin-meta.sh` 通过",
+      "- [ ] 重新构建 + 重启 DSH 后确认",
     ].join('\n')
 
     const SPEC_VISUAL = [
@@ -1112,92 +1383,6 @@ window.__ModuleLoader__.load({
       '- [ ] 成功提示会消失，错误和进行中不会',
     ].join('\n')
 
-    const SPEC_META = [
-      '# DSH 插件 · 元信息修正',
-      '',
-      '给**已经做好的插件**用：按体检结果逐条对齐，让面板能正确显示它。',
-      '',
-      '## 先跑体检，看缺什么',
-      '',
-      '```bash',
-      'dsh插件开发经验/scripts/check-plugin-meta.sh 你的插件目录',
-      '```',
-      '',
-      '面板里每个插件卡片上也有健康度标签，点一下会复制该插件的完整报告。',
-      '',
-      '## 七项对照表',
-      '',
-      '| 要控制的 | 写在哪 | 缺了会怎样 |',
-      '| --- | --- | --- |',
-      '| 卡片名字 | `locale/zh.json` → `meta.title` | 显示包名 |',
-      '| 一句话说明 | `meta.description` | 副标题空白 |',
-      '| 详情长文 | `meta.detail` | 回落读 README |',
-      '| 图标 | `package.json` → `exports["./icon"]` | 显示默认灰方块 |',
-      '| 能否加载 | `dsh.bundle.patch` | 装了不出现 |',
-      '| 客户端服务 | `dsh.client.inject` | 运行时报 undefined |',
-      '| 打包完整 | `files` | 用户装了看不到图标和中文名 |',
-      '',
-      '## 四种常见修法',
-      '',
-      '### 1. 面板显示英文包名',
-      '',
-      '两个原因，都可能同时存在：',
-      '',
-      '**a) 缺 locale**',
-      '',
-      '```json',
-      '// locale/zh.json',
-      '{ "meta": { "title": "中文名", "description": "一句话" } }',
-      '```',
-      '',
-      '**b) `cordis.patch.yml` 的 `name` 写了相对路径**',
-      '',
-      '```yaml',
-      '# 错：宿主按相对路径找不到包根，读不到 locale',
-      '      name: ./lib/index.js',
-      '# 对：写包名',
-      '      name: dsh-my-plugin',
-      '```',
-      '',
-      '改完要重新构建并重启 DSH。',
-      '',
-      '### 2. 图标是灰方块',
-      '',
-      '```json',
-      '"exports": { "./icon": "./icon.svg" },',
-      '"files": ["icon.svg", "locale/*.json"]',
-      '```',
-      '',
-      '光有 `icon.svg` 文件但不在 `exports` 里，等于没配。图标规格：24×24、`fill="none"`、`stroke="currentColor"`、`stroke-width="1.8"`。',
-      '',
-      '### 3. 详情页空白',
-      '',
-      '- `meta.detail` 指向的文件不存在 → 创建它',
-      '- 或者干脆不写 `meta.detail`，回落读 README 也是允许的',
-      '- 写了就要保证它进了 `files`',
-      '',
-      '### 4. 中文搜不到',
-      '',
-      '`keywords` 里加中文词，至少一个：',
-      '',
-      '```json',
-      '"keywords": ["dsh", "deepseek-harness", "dsh-plugin", "插件管理"]',
-      '```',
-      '',
-      '## 只对界面插件要求的部分',
-      '',
-      '纯 host 插件（没有 `dsh.client`）不显示图标、不渲染标题，**不要求** locale 和图标。系统内置的 host 插件大多没有这些，不是缺陷。',
-      '',
-      '## 改完核对',
-      '',
-      '- [ ] 面板卡片显示中文名，不是包名',
-      '- [ ] 有图标，不是灰方块',
-      '- [ ] 详情页有内容',
-      '- [ ] 中文能搜到',
-      '- [ ] `check-plugin-meta.sh` 通过',
-      '- [ ] 重新构建 + 重启 DSH 后确认',
-    ].join('\n')
-
     /** 目录的 7 个分类；`id` 是目录里的字段值，空串表示不过滤。 */
     const CATEGORIES = [
       { id: '', labelKey: 'list.categoryAll' },
@@ -1263,7 +1448,7 @@ window.__ModuleLoader__.load({
       '    "version": 1,',
       '    "kind": "web",',
       '    "title": "音频解析",',
-      '    "path": "/audio-rhythm-mobile"',
+      '    "path": "/dsh-audio-parse/mobile"',
       '  }',
       '}',
       '```',
@@ -1273,7 +1458,7 @@ window.__ModuleLoader__.load({
       '| `version` | ✅ | 固定 `1` |',
       '| `kind` | ✅ | `web`（HTML）或 `native`（Schema，**渲染器尚未实现，别用**） |',
       '| `title` | ✅ | 手机上面板标题 |',
-      '| `path` | `kind=web` 必填 | **必须以 `/` 开头** |',
+      '| `path` | `kind=web` 必填 | **必须以 `/` 开头**，统一用 `/<包名>/mobile` |',
       '',
       '**漏任何一个字段，移动端列表里那条会被静默过滤。**',
       '',
@@ -1283,12 +1468,12 @@ window.__ModuleLoader__.load({
       'export function registerMobile(ctx: Context): () => void {',
       '  return ctx.webServer.register({',
       '    kind: \'prefix\',',
-      '    path: \'/xxx-mobile\',',
+      '    path: \'/dsh-audio-parse/mobile\',',
       '    handler: async (req, res) => {',
       '      const url = new URL(req.url ?? \'/\', \'http://127.0.0.1\')',
       '',
       '      // ① 换 token：走 DSH 认证（App 带 cookie）',
-      '      if (url.pathname === \'/xxx-mobile/token\') {',
+      '      if (url.pathname === \'/dsh-audio-parse/mobile/token\') {',
       '        const rejection = (ctx as any).connection?.requestRejection?.(req)',
       '        if (rejection !== undefined) return send(rejection, \'unauthorized\')',
       '        return send(200, JSON.stringify({ token: mint(), expiresIn: 300 }))',
@@ -1327,7 +1512,58 @@ window.__ModuleLoader__.load({
       '}',
       '```',
       '',
-      '## 二、认证：token 由 App 签发，插件只验格式',
+      '## 二、外壳：App 提供返回，插件不要自己画',
+      '',
+      '手机端打开插件后，页面是**嵌在插件列表页里**显示的（同源 iframe），',
+      '顶部由 App 的导航栏负责：左边是「← 插件列表」，右边是「完成」。',
+      '',
+      '所以：',
+      '',
+      '- **不要在自己页面里做返回按钮**——会出现两个返回，而且位置还不一样',
+      '- 不要依赖 `window.top` / `parent` 做跨层操作，页面按「自己就是一屏」来写',
+      '- 页面宽度就是手机宽度，按 `100%` 布局，不要写死 px 宽度',
+      '',
+      '列表页本身的入口固定是 `dsh-plugin-panel` 的 `/dsh-plugin-panel/mobile`，',
+      '它在 App 的插件列表里固定排第一位——**你的插件不需要关心自己被谁打开**。',
+      '',
+      '列表页会记住上次停在哪里（`localStorage`）：上次停在某个插件，下次打开面板直接回到它；',
+      '按过「返回」的则保持在列表。插件侧不用做任何事。',
+      '',
+      '## 三、数据来源：照官方的顺序取，不要自己编',
+      '',
+      '**这一节是踩坑换来的。** 手机端列表一开始只拿了包名，结果桌面显示「会议纪要」、',
+      '手机显示 `dsh-meeting-memo`——同一个插件两套名字。原因是桌面走的是 DSH 的 locale 机制，',
+      '移动端自己从 `listBundles()` 里取了 `name`。',
+      '',
+      '### 官方怎么取',
+      '',
+      'DSH 启动时读插件元信息的规则（`dsh-app-boot` 里实现）：',
+      '',
+      '1. 入口固定是 `locale/en.json`，**它不存在就整套不加载**',
+      '2. 扫描 `locale/` 下所有 `*.json`，文件名去掉后缀就是语言 id（`zh`、`ja`…）',
+      '3. 每个文件读 `meta.title`、`meta.description`，`meta.detail` 指向长文档',
+      '4. 某个语言缺字段时，用 `package.json` 的 `name` / `description` 兜底',
+      '',
+      '所以插件要展示名字，**只该读这一套**，不要另找字段。',
+      '',
+      '### 移动端也要照这个顺序',
+      '',
+      '| 字段 | 顺序 |',
+      '| --- | --- |',
+      '| 标题 | `locale[当前语言].meta.title` → `locale.en.meta.title` → `package.json` 的 `name` |',
+      '| 简介 | `locale[当前语言].meta.description` → `locale.en.meta.description` → `package.json` 的 `description` |',
+      '| 长文 | `meta.detail` 指向的文件 → `README.md` 第一段 |',
+      '',
+      '当前语言按请求的 `Accept-Language` 挑，精确匹配不上就退回主语言（`zh-CN` → `zh`），再不行用 `zh`。',
+      '',
+      '### 什么是「自己编」',
+      '',
+      '- 拿 `bundle.name` 当展示名（就是这次的问题：手机上全是包名）',
+      '- 自己拼「中文名（包名）」这种标题——包名单独一行小字显示就够了',
+      '- 只读 `locale/zh.json` 而不检查 `en.json` 是否存在（官方以 en 为入口）',
+      '- `meta.detail` 指向的文件不存在却当成有内容',
+      '',
+      '## 四、认证：token 由 App 签发，插件只验格式',
       '',
       '```',
       'App 的「打开」→ 从 dsh-plugin-panel 换一次 token',
@@ -1341,7 +1577,7 @@ window.__ModuleLoader__.load({
       '**代价**：任何拿到 32 位串的人都能看那个页面。',
       '**所以：不要把敏感内容（密钥、私人数据）放进 `kind=web` 的页面。**',
       '',
-      '## 三、页面写法',
+      '## 五、页面写法',
       '',
       '**数据必须服务端直出。** 页面里 `fetch` 自己的 RPC 会被 `requestRejection` 挡掉（WebView 没有 cookie）：',
       '',
@@ -1365,7 +1601,7 @@ window.__ModuleLoader__.load({
       '- **切换时不要动滚动位置**（`scrollTo` 会让长页面「像被收起来」）',
       '- 空分类也显示（数量 0），让人知道是空的而不是坏了',
       '',
-      '## 四、六个坑（都是实际踩过的）',
+      '## 六、六个坑（都是实际踩过的）',
       '',
       '| # | 坑 | 症状 | 自查 |',
       '| --- | --- | --- | --- |',
@@ -1376,7 +1612,7 @@ window.__ModuleLoader__.load({
       '| 5 | CSS 优先级（`.detail a` 盖掉 `.open` 的 color） | 按钮文字和背景同色 | 截图 |',
       '| 6 | 用 `listBundles()` 拿 `enabled`/`entryId` | 拿不到（那是 `listPlugins()` 的） | 查 API 实际返回 |',
       '',
-      '## 五、自测流程（别靠人拿手机点）',
+      '## 七、自测流程（别靠人拿手机点）',
       '',
       '```bash',
       'npm run build:host',
@@ -1392,14 +1628,16 @@ window.__ModuleLoader__.load({
       'curl -sS -X POST ".../toggle?mt=$MT" -H "content-type: application/json" -d \'{"name":"你的插件","enabled":true}\'',
       '',
       '# 3. 验证页面（关键：查有没有「失败」文案）',
-      'curl -sS "http://127.0.0.1:3091/<前缀>-mobile?mt=$MT" | grep -o "读取[^<]*失败[^<]*" || echo "✓ 无错误"',
+      'curl -sS "http://127.0.0.1:3091/<包名>/mobile?mt=$MT" | grep -o "读取[^<]*失败[^<]*" || echo "✓ 无错误"',
       '',
       '# 4. 截图（视口 393×852）',
       '```',
       '',
-      '## 六、提交前检查清单',
+      '## 八、提交前检查清单',
       '',
-      '- [ ] `dsh.mobile` 四个字段齐全，`path` 以 `/` 开头',
+      '- [ ] `dsh.mobile` 四个字段齐全，`path` 形如 `/<包名>/mobile`',
+      '- [ ] 标题/简介读 `locale/*.json` 的 `meta.*`，不是拿包名顶替',
+      '- [ ] `locale/en.json` 存在（官方入口），缺了整套 locale 不生效',
       '- [ ] `import { registerMobile } from \'./mobile.ts\'`（带 `.ts`）',
       '- [ ] `apply()` 里 `scope.effect(() => registerMobile(scope), \'...\')`',
       '- [ ] 媒体路由接受 `mt` token',
@@ -1408,7 +1646,7 @@ window.__ModuleLoader__.load({
       '- [ ] 跑过 `check-plugin-mobile.mjs`，0 错误',
       '- [ ] 截图看过',
       '',
-      '## 七、起步模板',
+      '## 九、起步模板',
       '',
       '插件自带一份最小可用的骨架，复制改名即可：',
       '',
@@ -1424,9 +1662,8 @@ window.__ModuleLoader__.load({
 
     /** 三段场景规范；`id` 用于复制态的区分。 */
     const SPEC_SECTIONS = [
-      { id: 'new', title: '新建插件', hint: '从零到能装：命名、骨架、清单、元信息、自检', text: SPEC_NEW },
+      { id: 'skeleton', title: '骨架与元信息', hint: '命名、目录、清单、locale、图标、关于页；已有插件按第八节对齐', text: SPEC_SKELETON },
       { id: 'visual', title: '视觉设计', hint: '颜色、焦点、边框、尺寸、图标、图表', text: SPEC_VISUAL },
-      { id: 'meta', title: '元信息修正', hint: '给已做好的插件：逐条对齐，让面板正确显示', text: SPEC_META },
       { id: 'mobile', title: '移动端接入', hint: '让插件在 DSH Pocket iOS 里能被打开：声明、路由、认证、渲染', text: SPEC_MOBILE },
     ]
 
@@ -1638,7 +1875,7 @@ window.__ModuleLoader__.load({
       const [diagnoses, setDiagnoses] = React.useState({})
       const [copiedKey, setCopiedKey] = React.useState('')
       const [toast, setToast] = React.useState('')
-      const [specTab, setSpecTab] = React.useState('new')
+      const [specTab, setSpecTab] = React.useState('skeleton')
       const [marketCategory, setMarketCategory] = React.useState('')
       const [searchPage, setSearchPage] = React.useState(0)
       const [searchMeta, setSearchMeta] = React.useState(null)
@@ -1655,6 +1892,9 @@ window.__ModuleLoader__.load({
       const [plugins, setPlugins] = React.useState([])
       const [bundles, setBundles] = React.useState([])
       const [versionMap, setVersionMap] = React.useState({})
+      const [remoteResult, setRemoteResult] = React.useState(null)
+      const [remoteStatus, setRemoteStatus] = React.useState('')
+      const [remoteAdded, setRemoteAdded] = React.useState(0)
       const [status, setStatus] = React.useState(listPlugins ? 'loading' : 'unavailable')
       const [error, setError] = React.useState('')
       const [selectedId, setSelectedId] = React.useState('')
@@ -1670,6 +1910,20 @@ window.__ModuleLoader__.load({
         pref.current = { ...pref.current, ...next }
         savePref(pref.current)
       }
+
+      /** 自己有没有被自动更新过：有结果就在提示条上说一句，没有就安静。 */
+      React.useEffect(() => {
+        const call = props.loadSelfUpdate
+        if (typeof call !== 'function') return
+        let alive = true
+        Promise.resolve(call({})).then((result) => {
+          if (!alive) return
+          const value = result && result.ok === true ? result.value : result
+          if (!value || !value.note) return
+          if (value.status === 'updated' || value.status === 'failed') setListNote(value.note)
+        }).catch(() => {})
+        return () => { alive = false }
+      }, [props.loadSelfUpdate])
 
       /**
        * 查已装包有没有新版，只用官方接口：
@@ -1996,6 +2250,7 @@ window.__ModuleLoader__.load({
           { label: textOf(t, 'list.flags'), value: flags },
           { label: textOf(t, 'list.components'), value: componentText },
           { label: textOf(t, 'list.license'), value: manifest && manifest.license },
+          { label: textOf(t, 'list.size'), value: facts && facts.size ? formatSize(facts.size.bytes, facts.size.files, t) : '' },
           { label: textOf(t, 'list.repo'), value: repoLinkOf(manifest && manifest.repository) },
           { label: textOf(t, 'list.engines'), value: manifest && manifest.engines },
           { label: textOf(t, 'list.keywords'), value: manifest && Array.isArray(manifest.keywords) ? manifest.keywords.join('、') : '' },
@@ -2263,6 +2518,35 @@ window.__ModuleLoader__.load({
 
       const searchTimer = React.useRef(null)
 
+      const remoteSeq = React.useRef(0)
+
+      /** 本地索引没命中时，去 npm 实时查一次。 */
+      const runRemoteSearch = React.useCallback((query) => {
+        const call = props.searchRemote
+        const needle = String(query || '').trim()
+        if (typeof call !== 'function' || !needle) {
+          setRemoteResult(null)
+          setRemoteStatus('')
+          return
+        }
+        const seq = ++remoteSeq.current
+        setRemoteResult(null)
+        setRemoteStatus('loading')
+        Promise.resolve(call({ query: needle })).then((result) => {
+          if (seq !== remoteSeq.current) return
+          if (result && result.ok === false) {
+            setRemoteStatus('error')
+            return
+          }
+          const value = result && result.ok === true ? result.value : result
+          setRemoteResult(value && Array.isArray(value.items) ? value.items : [])
+          setRemoteAdded(Number(value && value.added) || 0)
+          setRemoteStatus('ready')
+        }).catch(() => {
+          if (seq === remoteSeq.current) setRemoteStatus('error')
+        })
+      }, [props.searchRemote])
+
       const runMarketSearch = React.useCallback((query, sort, category, page) => {
         const call = props.searchCatalog
         if (typeof call !== 'function') return
@@ -2284,6 +2568,9 @@ window.__ModuleLoader__.load({
           setSearchResult(value && Array.isArray(value.items) ? value.items : [])
           setSearchMeta(value ? { total: value.total || 0, offset: value.offset || 0, limit: value.limit || 100, pageCount: value.pageCount || 1 } : null)
           setSearchStatus('ready')
+          const hits = value && Array.isArray(value.items) ? value.items : []
+          if (hits.length === 0 && query.trim()) runRemoteSearch(query)
+          else { setRemoteResult(null); setRemoteStatus('') }
         }).catch(() => {
           setSearchResult(null)
           setSearchStatus('error')
@@ -2297,43 +2584,12 @@ window.__ModuleLoader__.load({
         searchTimer.current = setTimeout(() => runMarketSearch(value, searchSort, marketCategory, 0), 300)
       }
 
-      /** 「关于」页：这个插件是什么、基本事实、怎么分享给别人。 */
-      function aboutView() {
-        const profileDir = '~/.dsh/profiles/<profile>/.plugin-panel'
-        const facts = [
-          [textOf(t, 'list.aboutPackage'), 'dsh-plugin-panel'],
-          [textOf(t, 'list.aboutVersion'), VERSION],
-          [textOf(t, 'list.aboutLicense'), 'MIT'],
-          [textOf(t, 'list.aboutRepo'), 'github.com/jqlong17/dsh-plugin-panel'],
-          [textOf(t, 'list.aboutData'), profileDir],
-        ]
-        return h('div', { className: 'dsh-pl-market' },
-          h('section', { className: 'dsh-pl-about' },
-            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutWhat')),
-            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody1')),
-            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody2'))),
-          h('section', { className: 'dsh-pl-about' },
-            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutFacts')),
-            h('div', { className: 'dsh-pl-about-facts' },
-              facts.map(([label, value]) => h('div', { className: 'dsh-pl-about-fact', key: label },
-                h('span', { className: 'dsh-pl-about-label' }, label),
-                h('span', { className: 'dsh-pl-about-value' }, value))))),
-          h('section', { className: 'dsh-pl-about' },
-            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutShare')),
-            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutShareHint')),
-            h('pre', { className: 'dsh-pl-about-pre' }, shareText()),
-            h('button', {
-              type: 'button',
-              className: 'dsh-pl-about-copy',
-              onClick: () => { void copyShare() },
-            }, copiedKey === 'about' ? textOf(t, 'list.copied') : textOf(t, 'list.aboutCopy'))))
-      }
 
       function shareText() {
         return [
-          `请帮我在 DeepSeek Harness 上安装插件 dsh-plugin-panel（中文名「插件管理」，版本 ${VERSION}）。`,
+          '请帮我在 DeepSeek Harness 上安装插件 dsh-plugin-panel（中文名「插件管理」）。',
           '',
-          '它是右侧栏的插件管理器：列出已安装插件并标出入口，带插件市场（增长趋势、7 天增长榜、中文搜索、一键装卸），以及每个插件的元信息体检。',
+          '它是右侧栏的插件管理器：列出已安装插件并标出入口，带插件市场（增长趋势、7 天增长榜、中文搜索、一键装卸）、精选推荐，以及给插件开发者的设计规范。',
           '',
           '请按顺序做，每步做完告诉我结果：',
           '',
@@ -2341,6 +2597,15 @@ window.__ModuleLoader__.load({
           '2. 安装：dsh plugin --profile <你的 profile> add dsh-plugin-panel',
           '   如果 npm 上取不到这个包，说明还没发布，请直接告诉我，别自己改写依赖或去装同名的其它包。',
           '3. 装完提醒我重启 DeepSeek Harness，然后打开右侧栏确认「插件管理」出现。',
+          '',
+          '如果已经装过、需要升级到最新版：',
+          '',
+          '- 用同一条命令再加一次即可：dsh plugin --profile <你的 profile> add dsh-plugin-panel',
+          '  它会把已装的替换成 npm 上的最新版本，不需要先卸载。',
+          '- 不要指定具体版本号，直接装最新版；想知道最新是多少可以 npm view dsh-plugin-panel version。',
+          '- 升级完同样要重启 DeepSeek Harness 才会生效。',
+          '',
+          '版本以 npm 上发布的最新版为准，不需要我提供版本号。',
         ].join('\n')
       }
 
@@ -2402,6 +2667,13 @@ window.__ModuleLoader__.load({
         } finally {
           setBusyKey('')
         }
+      }
+
+      /** 列表 / 卡片切换：放在各个 tab 内部，而不是顶部全局。 */
+      function viewToggle() {
+        return h('div', { className: 'dsh-pl-view', role: 'group', 'aria-label': 'view' },
+          chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
+          chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) }))
       }
 
       function designView() {
@@ -2478,7 +2750,7 @@ window.__ModuleLoader__.load({
           h('p', { className: 'dsh-pl-note dsh-pl-featured-foot' }, textOf(t, 'list.featuredContact')))
       }
 
-      /** 「关于」页：这个插件是什么、基本事实、怎么分享给别人。 */
+      /** 「关于」页：这个插件是什么、每个页签干什么、怎么分享给别人。 */
       function aboutView() {
         const profileDir = '~/.dsh/profiles/<profile>/.plugin-panel'
         const facts = [
@@ -2488,11 +2760,26 @@ window.__ModuleLoader__.load({
           [textOf(t, 'list.aboutRepo'), 'github.com/jqlong17/dsh-plugin-panel'],
           [textOf(t, 'list.aboutData'), profileDir],
         ]
+        const tabRows = [
+          ['list.aboutTabPlugins', 'list.aboutTabPluginsBody'],
+          ['list.aboutTabMarket', 'list.aboutTabMarketBody'],
+          ['list.aboutTabFeatured', 'list.aboutTabFeaturedBody'],
+          ['list.aboutTabDesign', 'list.aboutTabDesignBody'],
+        ]
         return h('div', { className: 'dsh-pl-market' },
           h('section', { className: 'dsh-pl-about' },
             h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutWhat')),
             h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody1')),
             h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody2'))),
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutTabs')),
+            h('div', { className: 'dsh-pl-about-tabs' },
+              tabRows.map(([name, body]) => h('div', { className: 'dsh-pl-about-tab', key: name },
+                h('span', { className: 'dsh-pl-about-tab-name' }, textOf(t, name)),
+                h('span', { className: 'dsh-pl-about-tab-body' }, textOf(t, body)))))),
+          h('section', { className: 'dsh-pl-about' },
+            h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutAuto')),
+            h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutAutoBody'))),
           h('section', { className: 'dsh-pl-about' },
             h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutFacts')),
             h('div', { className: 'dsh-pl-about-facts' },
@@ -2510,66 +2797,6 @@ window.__ModuleLoader__.load({
             }, copiedKey === 'about' ? textOf(t, 'list.copied') : textOf(t, 'list.aboutCopy'))))
       }
 
-      function shareText() {
-        return [
-          `请帮我在 DeepSeek Harness 上安装插件 dsh-plugin-panel（中文名「插件管理」，版本 ${VERSION}）。`,
-          '',
-          '它是右侧栏的插件管理器：列出已安装插件并标出入口，带插件市场（增长趋势、7 天增长榜、中文搜索、一键装卸），以及每个插件的元信息体检。',
-          '',
-          '请按顺序做，每步做完告诉我结果：',
-          '',
-          '1. 确认当前 DSH 的 profile 名称（一般看 ~/.dsh/profiles/ 下哪个是你在用的）。',
-          '2. 安装：dsh plugin --profile <你的 profile> add dsh-plugin-panel',
-          '   如果 npm 上取不到这个包，说明还没发布，请直接告诉我，别自己改写依赖或去装同名的其它包。',
-          '3. 装完提醒我重启 DeepSeek Harness，然后打开右侧栏确认「插件管理」出现。',
-        ].join('\n')
-      }
-
-      async function copyShare() {
-        const text = shareText()
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(text)
-          } else {
-            const area = document.createElement('textarea')
-            area.value = text
-            area.style.position = 'fixed'
-            area.style.opacity = '0'
-            document.body.appendChild(area)
-            area.select()
-            document.execCommand('copy')
-            document.body.removeChild(area)
-          }
-          setCopiedKey('about')
-          showToast(textOf(t, 'list.aboutCopied'))
-          setTimeout(() => setCopiedKey(''), 2200)
-        } catch (failure) {
-          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
-        }
-      }
-
-      async function copySpec(section) {
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(section.text)
-          } else {
-            const area = document.createElement('textarea')
-            area.value = section.text
-            area.style.position = 'fixed'
-            area.style.opacity = '0'
-            document.body.appendChild(area)
-            area.select()
-            document.execCommand('copy')
-            document.body.removeChild(area)
-          }
-          setCopiedKey(`spec-${section.id}`)
-          showToast(textOf(t, 'list.designCopied').replace('{name}', section.title))
-          setTimeout(() => setCopiedKey(''), 2200)
-        } catch (failure) {
-          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
-        }
-      }
-
       function marketDetail(row) {
         const installed = isInstalled(row.name)
         const facts = [
@@ -2582,6 +2809,9 @@ window.__ModuleLoader__.load({
           row.version ? { label: textOf(t, 'list.version'), value: row.version } : null,
           row.categoryZh || row.category ? { label: textOf(t, 'list.hotCategory'), value: row.categoryZh || row.category } : null,
           row.repo ? { label: textOf(t, 'list.hotRepo'), value: repoLinkOf(row.repo) } : null,
+          row.license ? { label: textOf(t, 'list.license'), value: row.license } : null,
+          row.unpackedSize ? { label: textOf(t, 'list.sizeUnpacked'), value: formatSize(row.unpackedSize, row.fileCount, t) } : null,
+          row.remote ? { label: textOf(t, 'list.source'), value: textOf(t, 'list.remoteSource') } : null,
           { label: textOf(t, 'list.status'), value: installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled') },
         ].filter(Boolean)
         return h(DetailPanel, {
@@ -2658,13 +2888,49 @@ window.__ModuleLoader__.load({
               : searchStatus === 'error'
                 ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.searchError'))
                 : items.length === 0
-                  ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketNoMatch'))
+                  ? h('div', null,
+                    h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketNoMatch')),
+                    remoteStatus === 'loading'
+                      ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.remoteSearching'))
+                      : remoteStatus === 'error'
+                        ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.remoteError'))
+                        : remoteStatus === 'ready' && remoteResult && remoteResult.length
+                          ? h('section', { className: 'dsh-pl-block' },
+                            h('div', { className: 'dsh-pl-block-head' },
+                              h('strong', null, textOf(t, 'list.remoteHits').replace('{n}', String(remoteResult.length)))),
+                            h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.remoteHint')),
+                            remoteAdded > 0
+                              ? h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.remoteSaved').replace('{n}', String(remoteAdded)))
+                              : null,
+                            h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
+                              remoteResult.map((row, index) => h(PluginCard, {
+                                key: row.name || index,
+                                icon: null,
+                                title: row.name,
+                                subtitle: row.summary || '',
+                                className: 'is-market',
+                                badge: row.version ? h('span', { className: 'dsh-pl-metric' }, `v${row.version}`) : null,
+                                onClick: () => {
+                                  setSelectedMarket(row)
+                                  if (typeof props.remoteDetail !== 'function') return
+                                  Promise.resolve(props.remoteDetail({ name: row.name })).then((result) => {
+                                    const value = result && result.ok === true ? result.value : result
+                                    if (!value || !value.name) return
+                                    setSelectedMarket((prev) => (prev && prev.name === value.name ? { ...prev, ...value } : prev))
+                                  }).catch(() => {})
+                                },
+                                actions: [hotAction(row)],
+                              }))))
+                          : remoteStatus === 'ready'
+                            ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.remoteEmpty'))
+                            : null)
                   : h('div', null,
                     h('div', { className: 'dsh-pl-block-head' },
                       h('strong', null, textOf(t, 'list.marketHits').replace('{n}', String(searchMeta ? searchMeta.total : items.length).replace(/\B(?=(\d{3})+(?!\d))/g, ','))),
                       h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'sort' },
                         chip('hot', textOf(t, 'list.sortHot'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) }),
-                        chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) }))),
+                        chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) })),
+                      viewToggle()),
                     h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                       items.map((row, index) => h(PluginCard, {
                         key: row.name || index,
@@ -2721,8 +2987,7 @@ window.__ModuleLoader__.load({
         h('header', { className: 'dsh-pl-bar' },
           h('div', { className: 'dsh-pl-tools' },
             h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'filter' },
-              chip('installed', textOf(t, 'list.installed'), surface === 'market' || surface === 'featured' || surface === 'design' || surface === 'about' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
-              chip('builtin', textOf(t, 'list.builtin'), surface === 'market' || surface === 'featured' || surface === 'design' || surface === 'about' ? '' : filter, (id) => { setSurface('plugins'); setFilter(id); remember({ filter: id }) }),
+              chip('plugins', textOf(t, 'list.installedAll'), surface === 'plugins' ? 'plugins' : '', () => setSurface('plugins')),
               chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market')),
               chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => setSurface('featured')),
               chip('design', textOf(t, 'list.design'), surface === 'design' ? 'design' : '', () => setSurface('design')),
@@ -2740,10 +3005,7 @@ window.__ModuleLoader__.load({
                 }
               },
             }, textOf(t, 'list.refresh')),
-            h('div', { className: 'dsh-pl-view', role: 'group', 'aria-label': 'view' },
-              chip('list', textOf(t, 'list.viewList'), view, (id) => { setView(id); remember({ layout: id }) }),
-              chip('card', textOf(t, 'list.viewCard'), view, (id) => { setView(id); remember({ layout: id }) })),
-            h('span', { className: 'dsh-pl-version' }, VERSION))),
+            )),
         toast ? h('div', { className: 'dsh-pl-toast', role: 'status' },
           h('span', { className: 'dsh-pl-toast-dot' }),
           h('span', null, toast)) : null,
@@ -2767,6 +3029,18 @@ window.__ModuleLoader__.load({
               : selected
                 ? detailAside(selected)
                 : h('div', { className: 'dsh-pl-body' },
+                h('div', { className: 'dsh-pl-subtabs', role: 'tablist', 'aria-label': 'installed scope' },
+                  [['installed', textOf(t, 'list.installed')], ['builtin', textOf(t, 'list.builtin')]].map(([id, label]) => {
+                    const n = plugins.filter((item) => originOf(item) === id).length
+                    return h('button', {
+                      key: id,
+                      type: 'button',
+                      className: `dsh-pl-subtab${filter === id ? ' is-on' : ''}`,
+                      'aria-selected': filter === id,
+                      onClick: () => { setFilter(id); remember({ filter: id }) },
+                    }, h('span', null, label), h('span', { className: 'dsh-pl-subtab-n' }, String(n)))
+                  }),
+                  viewToggle()),
                 h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                   visible.length === 0
                     ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.empty'))
@@ -2872,11 +3146,10 @@ window.__ModuleLoader__.load({
 .dsh-pl { display: flex; flex-direction: column; flex: 1 1 auto; height: 100%; min-height: 0; min-width: 0; padding-top: 8px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font-family: inherit; font-size: var(--pl-fs-md); line-height: 1.4; }
 .dsh-pl-bar { display: flex; flex: none; flex-direction: column; gap: 8px; margin: 0; padding: 12px 12px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)); position: relative; z-index: 1; }
 .dsh-pl-top { display: flex; align-items: center; justify-content: space-between; }
-.dsh-pl-version, .dsh-pl-hint, .dsh-pl-item span { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
+.dsh-pl-hint, .dsh-pl-item span { color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-hint { margin: 0; }
 .dsh-pl-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
 .dsh-pl-refresh { margin-left: auto; }
-.dsh-pl-version { margin-left: 10px; }
 .dsh-pl-view { display: flex; gap: 2px; padding: 2px; border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-2); }
 .dsh-pl-view button { border: 0; border-radius: var(--pl-radius-pill); padding: 3px 8px; font-size: var(--pl-fs-xs); background: transparent; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-view button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; }
@@ -2887,7 +3160,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-seg button { border: 0; border-radius: var(--pl-radius-pill); background: transparent; color: var(--dsw-alias-label-secondary); padding: 5px 12px; }
 .dsh-pl-seg button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; box-shadow: none; }
 .dsh-pl-item.is-on { border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary); }
-.dsh-pl-body { display: flex; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
+.dsh-pl-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
 .dsh-pl-rows, .dsh-pl-grid { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 8px; }
 .dsh-pl-rows { display: flex; flex-direction: column; gap: 6px; }
 .dsh-pl-grid { display: flex; flex-direction: column; gap: 10px; align-content: start; padding: 12px; }
@@ -2940,10 +3213,12 @@ window.__ModuleLoader__.load({
 .dsh-pl-md h4 { margin: 10px 0 4px; font-size: var(--pl-fs-md); font-weight: 650; }
 .dsh-pl-md p, .dsh-pl-md li { margin: 0 0 8px; font-size: var(--pl-fs-md); line-height: 1.55; }
 .dsh-pl-md ul { margin: 0 0 10px; padding-left: 18px; }
+.dsh-pl-md ol { margin: 0 0 10px; padding-left: 20px; }
+.dsh-pl-md li { margin: 0 0 4px; }
 .dsh-pl-md code { font-size: var(--pl-fs-sm); padding: 0 4px; border-radius: 4px; background: var(--dsw-alias-bg-layer-2); }
 .dsh-pl-md a { color: var(--dsw-alias-state-business-primary); }
 .dsh-pl-table-wrap { margin: 8px 0 14px; overflow-x: auto; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); }
-.dsh-pl-md pre { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--pl-fs-xs); line-height: 1.75; overflow-x: auto; }
+.dsh-pl-md pre { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-base); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--pl-fs-xs); line-height: 1.75; overflow-x: auto; tab-size: 2; }
 .dsh-pl-md pre code { padding: 0; background: transparent; font-size: inherit; font-family: inherit; }
 .dsh-pl-md blockquote { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-2); border-radius: 0 var(--pl-radius-chip) var(--pl-radius-chip) 0; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-md table { width: 100%; border-collapse: collapse; font-size: var(--pl-fs-md); }
@@ -2971,6 +3246,10 @@ window.__ModuleLoader__.load({
 .dsh-pl-about-p { margin: 0 0 8px; font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-about-p:last-of-type { margin-bottom: 0; }
 .dsh-pl-about-facts { display: flex; flex-direction: column; gap: 8px; }
+.dsh-pl-about-tabs { display: flex; flex-direction: column; gap: 10px; }
+.dsh-pl-about-tab { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-about-tab-name { font-size: var(--pl-fs-sm); font-weight: 600; color: var(--dsw-alias-label-primary); }
+.dsh-pl-about-tab-body { font-size: var(--pl-fs-xs); line-height: 1.6; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-about-fact { display: flex; gap: 12px; align-items: baseline; }
 .dsh-pl-about-label { flex: none; width: 72px; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-about-value { min-width: 0; font-size: var(--pl-fs-sm); color: var(--dsw-alias-label-primary); word-break: break-all; }
@@ -2988,12 +3267,20 @@ window.__ModuleLoader__.load({
 .dsh-pl-copy-spec { flex: none; margin-left: auto; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-chip); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
 .dsh-pl-copy-spec:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.dsh-pl-block-head > .dsh-pl-view { flex: none; margin-left: 4px; }
 .dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
 .dsh-pl-block-head span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-block { margin-bottom: 22px; }
 .dsh-pl-market .dsh-pl-note { margin: 10px 2px 0; }
 .dsh-pl-hot { margin-top: 4px; }
 .dsh-pl-search-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.dsh-pl-subtabs { display: flex; flex: none; align-items: center; gap: 6px; padding: 10px 12px 0; }
+.dsh-pl-subtabs > .dsh-pl-view { margin-left: auto; }
+.dsh-pl-subtab { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--pl-radius-pill); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
+.dsh-pl-subtab:hover { border-color: var(--dsw-alias-border-l2); color: var(--dsw-alias-label-primary); }
+.dsh-pl-subtab.is-on { border-color: transparent; background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-on-color); }
+.dsh-pl-subtab-n { font-variant-numeric: tabular-nums; opacity: 0.75; }
+.dsh-pl-body > .dsh-pl-grid { flex: 1 1 auto; min-height: 0; padding-top: 8px; }
 .dsh-pl-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0 4px; }
 .dsh-pl-pager-btn { flex: none; padding: 6px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); cursor: pointer; }
 .dsh-pl-pager-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2); }
@@ -3029,6 +3316,9 @@ window.__ModuleLoader__.load({
         const loadMarketTrend = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'trend', payload || {})
         const loadMarketHot = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'hot', payload || {})
         const searchCatalog = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'search', payload || {})
+        const searchRemote = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'remote-search', payload || {})
+        const remoteDetail = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'remote-detail', payload || {})
+        const loadSelfUpdate = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'self-update', payload || {})
         const updateBundle = typeof pluginManager.updateBundle === 'function'
           ? pluginManager.updateBundle.bind(pluginManager)
           : null
@@ -3121,7 +3411,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, searchRemote, remoteDetail, loadSelfUpdate, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }

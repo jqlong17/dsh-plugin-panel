@@ -14,7 +14,7 @@ cp node_modules/dsh-plugin-panel/templates/mobile-plugin/mobile.ts 你的插件/
 
 ```ts
 const MOBILE_CHANNEL = '<REPLACE_ME>/mobile'
-//                     ↑ 换成你的插件前缀，比如 '/audio-rhythm/mobile'
+//                     ↑ 换成你的插件前缀，统一用 '/<包名>/mobile'（如 '/dsh-audio-parse/mobile'）
 ```
 
 **② `package.json` 的声明**
