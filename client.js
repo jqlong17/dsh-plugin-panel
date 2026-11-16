@@ -3790,6 +3790,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-featured-foot { margin: 12px 0 0; padding: 0 12px 12px; }
 .dsh-pl-accent { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
 .dsh-pl-surface { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 12px; }
+/* 子元素不许被压缩：里面有 overflow:hidden 的块会被裁掉，导致页面滚不动 */
+.dsh-pl-surface > * { flex: 0 0 auto; min-width: 0; }
 .dsh-pl-surface .dsh-pl-grid { padding: 0; overflow: visible; flex: none; }
 .dsh-pl-surface .dsh-pl-subtabs { padding: 0; }
 .dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
