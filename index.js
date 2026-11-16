@@ -106,6 +106,98 @@ export function apply(ctx) {
   })
 }
 
+// ── 本地目录扫描 ──────────────────────────────────────────────
+// 用途：插件还在本地开发、或者 DSH 重置后掉出了 profile，它们不会出现在已安装列表里。
+// 给一个目录，扫出下面所有「长得像 DSH 插件」的包，标出装没装。
+//
+// 判定「是插件」的标准和官方一致：package.json 里有 dsh.bundle / dsh.client，
+// 或者根目录有 cordis.patch.yml。不靠目录名猜。
+
+function expandHome(input) {
+  const raw = String(input || '').trim()
+  if (!raw) return ''
+  if (raw === '~') return process.env.HOME || raw
+  if (raw.startsWith('~/')) return path.join(process.env.HOME || '', raw.slice(2))
+  return raw
+}
+
+/** 一个目录下的 DSH 插件候选。只看一层，不递归。 */
+function scanPluginDir(root, services) {
+  const dir = expandHome(root)
+  if (!dir) return { dir: '', items: [], error: '没有指定目录' }
+  if (!existsSync(dir)) return { dir, items: [], error: '这个目录不存在' }
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return { dir, items: [], error: '目录读不了（权限？）' }
+  }
+
+  const items = []
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue
+    const folder = path.join(dir, entry.name)
+    let pkg
+    try {
+      pkg = JSON.parse(readFileSync(path.join(folder, 'package.json'), 'utf8'))
+    } catch {
+      continue
+    }
+    const dsh = pkg.dsh && typeof pkg.dsh === 'object' ? pkg.dsh : {}
+    const hasBundle = Boolean(dsh.bundle)
+    const hasClient = Boolean(dsh.client)
+    const hasMobile = Boolean(dsh.mobile)
+    const hasPatch = existsSync(path.join(folder, 'cordis.patch.yml'))
+    if (!hasBundle && !hasClient && !hasPatch) continue
+    const texts = readBundleTexts(pkg.name || entry.name, 'zh')
+    items.push({
+      folder,
+      name: typeof pkg.name === 'string' ? pkg.name : entry.name,
+      version: typeof pkg.version === 'string' ? pkg.version : '',
+      title: texts.title || '',
+      description: pkg.description || '',
+      hasBundle,
+      hasClient,
+      hasMobile,
+    })
+  }
+
+  items.sort((a, b) => a.name.localeCompare(b.name))
+  return { dir, items, error: '' }
+}
+
+/** 扫出来的包哪些已经在 profile 里了（按包名，或按 source 里的路径对上）。 */
+async function markScanned(pluginManager, scanned) {
+  let bundles = []
+  try {
+    bundles = await pluginManager.listBundles()
+  } catch {
+    bundles = []
+  }
+  const byName = new Map()
+  const byPath = new Map()
+  for (const bundle of Array.isArray(bundles) ? bundles : []) {
+    if (!bundle || typeof bundle.name !== 'string') continue
+    byName.set(bundle.name, bundle)
+    const source = String(bundle.source || '')
+    const at = source.lastIndexOf('@')
+    const tail = at >= 0 ? source.slice(at + 1) : source
+    if (tail.startsWith('link:') || tail.startsWith('file:')) {
+      byPath.set(path.resolve(tail.slice(tail.indexOf(':') + 1)), bundle)
+    }
+  }
+  return scanned.map((item) => {
+    const byPathHit = byPath.get(path.resolve(item.folder))
+    const hit = byPathHit || byName.get(item.name)
+    return {
+      ...item,
+      installed: Boolean(hit && hit.installed !== false),
+      installedSource: hit && typeof hit.source === 'string' ? hit.source : '',
+      installedVersion: hit && typeof hit.version === 'string' ? hit.version : '',
+    }
+  })
+}
+
 // ── 自我更新 ──────────────────────────────────────────────────
 // 每天查一次 npm，有新版就装上；装完必须重启 DSH 才生效（host 模块不会热替换）。
 //
@@ -942,6 +1034,12 @@ function registerDetailRpc(ctx, services) {
         }
         else if (method === 'remote-detail') result = { ok: true, value: await collectRemoteDetail(record.payload) }
         else if (method === 'self-update') result = { ok: true, value: { ...selfUpdateState } }
+        else if (method === 'scan') {
+          const input = record.payload && typeof record.payload === 'object' ? record.payload : {}
+          const found = scanPluginDir(input.dir, services)
+          const items = await markScanned(services.pluginManager, found.items)
+          result = { ok: true, value: { dir: found.dir, error: found.error, items } }
+        }
         else if (method === 'diagnose') {
           const entries = Array.isArray(record.payload && record.payload.plugins) ? record.payload.plugins.length : 0
           writeDiagnoseLog(`diagnose called with ${entries} plugins`)

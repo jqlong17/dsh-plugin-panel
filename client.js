@@ -172,6 +172,16 @@ window.__ModuleLoader__.load({
         'list.installLink': '本地开发（软链）',
         'list.installFile': '本地文件',
         'list.localTag': '本地',
+        'list.scanTab': '本地扫描',
+        'list.scanButton': '扫描',
+        'list.scanning': '扫描中…',
+        'list.scanPlaceholder': '/Users/你/projects/dsh-plugins',
+        'list.scanHint': '填一个目录，列出下面所有 DSH 插件（正在开发、或者 DSH 重置后掉出 profile 的都在这里）。装了的显示已安装，没装的可以直接安装。',
+        'list.scanIdle': '填一个目录再点「扫描」',
+        'list.scanEmpty': '这个目录下没有找到 DSH 插件',
+        'list.scanNeedDir': '还没有填目录',
+        'list.scanFailed': '扫描失败',
+        'list.scanInstalled': '{name} 已安装，重启 DSH 后生效',
         'list.doc': '说明文档',
         
         'list.docLoading': '正在读取说明…',
@@ -356,6 +366,16 @@ window.__ModuleLoader__.load({
         'list.installLink': 'Local dev (link)',
         'list.installFile': 'Local file',
         'list.localTag': 'Local',
+        'list.scanTab': 'Scan',
+        'list.scanButton': 'Scan',
+        'list.scanning': 'Scanning…',
+        'list.scanPlaceholder': '/Users/you/projects/dsh-plugins',
+        'list.scanHint': 'Point at a directory to list every DSH plugin under it — work in progress, or plugins dropped from the profile by a reset. Installed ones show as installed; the rest can be installed right here.',
+        'list.scanIdle': 'Enter a directory, then Scan',
+        'list.scanEmpty': 'No DSH plugin found in this directory',
+        'list.scanNeedDir': 'No directory yet',
+        'list.scanFailed': 'Scan failed',
+        'list.scanInstalled': '{name} installed — restart DSH to apply',
         'list.doc': 'Notes',
         
         'list.docLoading': 'Reading notes…',
@@ -1954,6 +1974,10 @@ window.__ModuleLoader__.load({
       const [plugins, setPlugins] = React.useState([])
       const [bundles, setBundles] = React.useState([])
       const [versionMap, setVersionMap] = React.useState({})
+      const [scanDir, setScanDir] = React.useState(pref.current.scanDir || '')
+      const [scanItems, setScanItems] = React.useState([])
+      const [scanStatus, setScanStatus] = React.useState('')
+      const [scanError, setScanError] = React.useState('')
       const [remoteResult, setRemoteResult] = React.useState(null)
       const [remoteStatus, setRemoteStatus] = React.useState('')
       const [remoteAdded, setRemoteAdded] = React.useState(0)
@@ -2724,6 +2748,134 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /** 扫一个目录，列出现在装着和没装着的插件。 */
+      const runScan = React.useCallback((dir) => {
+        const call = props.scanPlugins
+        if (typeof call !== 'function') return
+        const target = String(dir || '').trim()
+        if (!target) {
+          setScanStatus('error')
+          setScanError(textOf(t, 'list.scanNeedDir'))
+          return
+        }
+        setScanStatus('loading')
+        setScanError('')
+        Promise.resolve(call({ dir: target })).then((result) => {
+          if (result && result.ok === false) {
+            setScanStatus('error')
+            setScanError(textOf(t, 'list.scanFailed'))
+            return
+          }
+          const value = result && result.ok === true ? result.value : result
+          setScanItems(value && Array.isArray(value.items) ? value.items : [])
+          setScanError((value && value.error) || '')
+          setScanStatus('ready')
+        }).catch((failure) => {
+          setScanStatus('error')
+          setScanError(failure instanceof Error ? failure.message : textOf(t, 'list.scanFailed'))
+        })
+      }, [props.scanPlugins])
+
+      /** 从本地路径装一个还没装的插件（spec 就是绝对路径）。 */
+      async function installFromPath(item) {
+        if (typeof props.installBundle !== 'function' || busyKey) return
+        setBusyKey(item.folder)
+        try {
+          const result = await props.installBundle(String(item.folder), {})
+          if (result && result.ok === false) {
+            const error = result.error || {}
+            setFailedKey(item.folder)
+            setActionNote(`${textOf(t, 'list.installFailed')}：${error.message || error.code || 'unknown'}`)
+            return
+          }
+          setActionNote('')
+          showToast(textOf(t, 'list.scanInstalled').replace('{name}', item.name))
+          setTimeout(() => { void runScan(scanDir) }, 600)
+        } catch (failure) {
+          setFailedKey(item.folder)
+          setActionNote(`${textOf(t, 'list.installFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        } finally {
+          setBusyKey('')
+        }
+      }
+
+      /** 本地扫描：输入一个目录，列出下面所有插件，标出装没装。 */
+      function scanView() {
+        const items = Array.isArray(scanItems) ? scanItems : []
+        return h('div', { className: 'dsh-pl-scan' },
+          h('div', { className: 'dsh-pl-scan-bar' },
+            h('input', {
+              type: 'text',
+              className: 'dsh-pl-search',
+              value: scanDir,
+              placeholder: textOf(t, 'list.scanPlaceholder'),
+              onChange: (event) => {
+                const value = event.target.value
+                setScanDir(value)
+                remember({ scanDir: value })
+              },
+              onKeyDown: (event) => {
+                if (event.key === 'Enter') void runScan(scanDir)
+              },
+            }),
+            h('button', {
+              type: 'button',
+              className: 'dsh-pl-card-btn',
+              disabled: scanStatus === 'loading',
+              onClick: () => { void runScan(scanDir) },
+            }, scanStatus === 'loading' ? textOf(t, 'list.scanning') : textOf(t, 'list.scanButton'))),
+          h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.scanHint')),
+          scanStatus === 'loading'
+            ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.scanning'))
+            : scanError
+              ? h('p', { className: 'dsh-pl-state' }, scanError)
+              : scanStatus === 'ready' && items.length === 0
+                ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.scanEmpty'))
+                : items.length === 0
+                  ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.scanIdle'))
+                  : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
+                    items.map((item) => {
+                      const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
+                      const installed = Boolean(item.installed || plugin)
+                      return h(PluginCard, {
+                        key: item.folder,
+                        icon: plugin ? h('img', { src: safeIcon(plugin.meta && plugin.meta.icon), alt: '', draggable: false }) : null,
+                        title: item.title || item.name,
+                        subtitle: item.folder,
+                        className: 'is-market',
+                        badge: h('span', { className: 'dsh-pl-local-tag' }, installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled')),
+                        onClick: () => {
+                          if (plugin) setSelectedId(plugin.entryId)
+                        },
+                        actions: [
+                          installed
+                            ? null
+                            : h('button', {
+                              key: 'install',
+                              type: 'button',
+                              className: 'dsh-pl-card-btn',
+                              disabled: busyKey === item.folder,
+                              onClick: (event) => {
+                                event.stopPropagation()
+                                void installFromPath(item)
+                              },
+                            }, busyKey === item.folder ? textOf(t, 'list.installing') : textOf(t, 'list.install')),
+                          h('button', {
+                            key: 'reveal',
+                            type: 'button',
+                            className: 'dsh-pl-card-btn',
+                            onClick: (event) => {
+                              event.stopPropagation()
+                              if (typeof props.revealPackage === 'function') {
+                                void props.revealPackage({ moduleName: item.name || '', source: `link:${item.folder}` })
+                              }
+                            },
+                          }, textOf(t, 'list.reveal')),
+                        ].filter(Boolean),
+                      })
+                    })))
+      }
+
       /** 列表 / 卡片切换：放在各个 tab 内部，而不是顶部全局。 */
       function viewToggle() {
         return h('div', { className: 'dsh-pl-view', role: 'group', 'aria-label': 'view' },
@@ -3135,18 +3287,20 @@ window.__ModuleLoader__.load({
                 ? detailAside(selected)
                 : h('div', { className: 'dsh-pl-body' },
                 h('div', { className: 'dsh-pl-subtabs', role: 'tablist', 'aria-label': 'installed scope' },
-                  [['installed', textOf(t, 'list.installed')], ['builtin', textOf(t, 'list.builtin')]].map(([id, label]) => {
-                    const n = plugins.filter((item) => originOf(item) === id).length
+                  [['installed', textOf(t, 'list.installed')], ['builtin', textOf(t, 'list.builtin')], ['scan', textOf(t, 'list.scanTab')]].map(([id, label]) => {
+                    const n = id === 'scan' ? 0 : plugins.filter((item) => originOf(item) === id).length
                     return h('button', {
                       key: id,
                       type: 'button',
                       className: `dsh-pl-subtab${filter === id ? ' is-on' : ''}`,
                       'aria-selected': filter === id,
                       onClick: () => { setFilter(id); remember({ filter: id }) },
-                    }, h('span', null, label), h('span', { className: 'dsh-pl-subtab-n' }, String(n)))
+                    }, h('span', null, label), id === 'scan' ? null : h('span', { className: 'dsh-pl-subtab-n' }, String(n)))
                   }),
                   viewToggle()),
-                h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
+                filter === 'scan'
+                  ? scanView()
+                  : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                   visible.length === 0
                     ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.empty'))
                     : visible.map((plugin) => {
@@ -3371,6 +3525,9 @@ window.__ModuleLoader__.load({
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dsh-pl-block-head > .dsh-pl-view { flex: none; margin-left: 4px; }
 .dsh-pl-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.dsh-pl-scan { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
+.dsh-pl-scan-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dsh-pl-scan-bar .dsh-pl-search { flex: 1 1 auto; margin: 0; }
 .dsh-pl-section-title { font-size: var(--pl-fs-md); font-weight: 600; color: var(--dsw-alias-label-primary); margin-right: auto; }
 .dsh-pl-local-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-market .dsh-pl-grid { padding-left: 0; padding-right: 0; }
@@ -3426,6 +3583,7 @@ window.__ModuleLoader__.load({
         const searchRemote = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'remote-search', payload || {})
         const remoteDetail = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'remote-detail', payload || {})
         const loadSelfUpdate = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'self-update', payload || {})
+        const scanPlugins = (payload) => rpcCall('/dsh-plugins-ui-rpc', 'scan', payload || {})
         const updateBundle = typeof pluginManager.updateBundle === 'function'
           ? pluginManager.updateBundle.bind(pluginManager)
           : null
@@ -3518,7 +3676,7 @@ window.__ModuleLoader__.load({
           name: 'sidebar.right.pane.tab',
           key: PANEL_ID,
           locale: NS,
-          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, searchRemote, remoteDetail, loadSelfUpdate, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
+          inject: () => ({ listPlugins, listBundles, readBundleDetail, setPluginEnabled, installBundle, removeBundle, updateBundle, listVersions, loadFacts, revealPackage, loadMarketTrend, loadMarketHot, searchCatalog, searchRemote, remoteDetail, loadSelfUpdate, scanPlugins, diagnosePlugins, listGuide, subscribeGuide, listSeats, subscribeSeats, openPanel, t, readLocale, subscribeLocale }),
         }, ListView)), 'plugin-list: tab body')
       },
     }
