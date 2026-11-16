@@ -437,9 +437,11 @@ window.__ModuleLoader__.load({
       try {
         const parsed = JSON.parse(window.localStorage.getItem(PREF_KEY) || '{}')
         return {
-          filter: parsed.filter === 'builtin' ? 'builtin' : 'installed',
+          filter: parsed.filter === 'builtin' || parsed.filter === 'scan' ? parsed.filter : 'installed',
           pins: Array.isArray(parsed.pins) ? parsed.pins.filter((id) => typeof id === 'string') : [],
           layout: parsed.layout === 'card' ? 'card' : 'list',
+          // 本地扫描的目录要留着：重启电脑、插件重载之后还能直接扫
+          scanDir: typeof parsed.scanDir === 'string' ? parsed.scanDir : '',
         }
       } catch {
         return { filter: 'installed', pins: [], layout: 'list' }
@@ -2813,6 +2815,15 @@ window.__ModuleLoader__.load({
           setScanError(failure instanceof Error ? failure.message : textOf(t, 'list.scanFailed'))
         })
       }, [props.scanPlugins])
+
+      // 进到「本地扫描」时，如果记着目录就自动扫一次，不用每次手点
+      React.useEffect(() => {
+        if (filter !== 'scan') return
+        const saved = String(pref.current.scanDir || '').trim()
+        if (!saved) return
+        if (scanStatus === 'ready' || scanStatus === 'loading') return
+        void runScan(saved)
+      }, [filter, scanStatus, runScan])
 
       /** 从本地路径装一个还没装的插件（spec 就是绝对路径）。 */
       async function installFromPath(item) {
