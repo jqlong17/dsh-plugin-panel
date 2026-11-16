@@ -190,6 +190,9 @@ window.__ModuleLoader__.load({
         'list.scanFailed': '扫描失败',
         'list.scanInstalled': '{name} 已安装，重启 DSH 后生效',
         'list.toggleUnavailable': '这个条目不能从这里启停，请用 dsh plugin 命令',
+        'list.actions': '操作',
+        'list.healthCopy': '复制报告',
+        'list.installFromLocal': '安装（本地路径）',
         'list.toggleFailed': '启停失败',
         'list.toggleOn': '{name} 已启动',
         'list.toggleOff': '{name} 已停用',
@@ -400,6 +403,9 @@ window.__ModuleLoader__.load({
         'list.scanFailed': 'Scan failed',
         'list.scanInstalled': '{name} installed — restart DSH to apply',
         'list.toggleUnavailable': 'This entry cannot be toggled from here; use the dsh plugin command',
+        'list.actions': 'Actions',
+        'list.healthCopy': 'copy report',
+        'list.installFromLocal': 'Install (local path)',
         'list.toggleFailed': 'Toggle failed',
         'list.toggleOn': '{name} started',
         'list.toggleOff': '{name} stopped',
@@ -1892,20 +1898,11 @@ window.__ModuleLoader__.load({
       return `${Math.floor(days / 365)} 年前`
     }
 
-    function marketMetric(row) {
-      const stars = row.stars > 0 ? `★ ${compactNumber(row.stars)}` : ''
-      const when = relativeDay(row.publishedAt || '')
-      const parts = [stars, when].filter(Boolean)
-      if (!parts.length) return null
-      return {
-        text: parts.join(' · '),
-        title: [row.stars > 0 ? `${row.stars} stars` : '', row.publishedAt || ''].filter(Boolean).join('  '),
-      }
-    }
+
 
     /** One card shape, shared by the plugin list and the market ranking. */
     function PluginCard(options) {
-      const { icon, title, subtitle, actions, className, onClick, badge } = options
+      const { icon, title, subtitle, meta, actions, className, onClick, badge } = options
       const classes = ['dsh-pl-item']
       if (className) classes.push(className)
       return h('div', {
@@ -1923,7 +1920,8 @@ window.__ModuleLoader__.load({
       icon || h(DefaultPluginIcon),
       h('span', { className: 'dsh-pl-copy' },
         h('strong', null, title),
-        subtitle ? h('span', { className: 'dsh-pl-where' }, subtitle) : null),
+        subtitle ? h('span', { className: 'dsh-pl-where' }, subtitle) : null,
+        meta && meta.length ? h('span', { className: 'dsh-pl-meta' }, meta.join(' · ')) : null),
       badge || null,
       actions && actions.length ? h('div', { className: 'dsh-pl-acts' }, actions) : null)
     }
@@ -2026,6 +2024,7 @@ window.__ModuleLoader__.load({
       const [scanItems, setScanItems] = React.useState([])
       const [scanStatus, setScanStatus] = React.useState('')
       const [scanError, setScanError] = React.useState('')
+      const [cardMenu, setCardMenu] = React.useState(null)
       const [remoteResult, setRemoteResult] = React.useState(null)
       const [remoteStatus, setRemoteStatus] = React.useState('')
       const [remoteAdded, setRemoteAdded] = React.useState(0)
@@ -2640,7 +2639,7 @@ window.__ModuleLoader__.load({
                 : shown.length === 0
                 ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.hotNoMatch'))
                 : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
-                  shown.map((row) => marketCard(row, h('span', { className: 'dsh-pl-delta' }, `+${row.delta.toLocaleString()}`)))))
+                  shown.map((row) => marketCard(row))))
       }
 
       const searchTimer = React.useRef(null)
@@ -2931,65 +2930,212 @@ window.__ModuleLoader__.load({
                   : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                     items.map((item) => {
                       const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
+                      const bundle = plugin ? matchBundle(plugin, bundles) : null
                       const state = item.state || (item.installed ? 'active' : 'missing')
                       const installed = state !== 'missing'
-                      const stateLabel = textOf(t, state === 'active' ? 'list.stateActive'
-                        : state === 'disabled' ? 'list.stateDisabled'
-                        : state === 'failed' ? 'list.stateFailed'
-                        : state === 'inactive' ? 'list.stateInactive'
-                        : 'list.notInstalled')
-                      return h(PluginCard, {
+                      return unifiedCard({
                         key: item.folder,
-                        icon: plugin ? h('img', { src: safeIcon(plugin.meta && plugin.meta.icon), alt: '', draggable: false }) : null,
+                        iconUrl: plugin ? safeIcon(plugin.meta && plugin.meta.icon) : '',
                         title: item.title || item.name,
                         subtitle: item.folder,
-                        className: 'is-market',
-                        badge: h('span', { className: `dsh-pl-local-tag${state === 'failed' ? ' is-failed' : state === 'disabled' ? ' is-off' : ''}` }, stateLabel),
+                        meta: [
+                          item.version ? `v${item.version}` : '',
+                          installed && plugin
+                            ? placesFor(plugin, guide, seats, localeId)
+                              .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
+                              .join(' · ')
+                            : '',
+                          bundle ? installSourceText(bundle, t) : '',
+                        ].filter(Boolean),
+                        className: installed ? 'is-market' : 'is-market',
+                        tag: textOf(t, state === 'active' ? 'list.stateActive'
+                          : state === 'disabled' ? 'list.stateDisabled'
+                          : state === 'failed' ? 'list.stateFailed'
+                          : state === 'inactive' ? 'list.stateInactive'
+                          : 'list.notInstalled'),
+                        tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
                         onClick: () => {
                           if (plugin) setSelectedId(plugin.entryId)
                         },
-                        actions: [
-                          !installed
-                            ? h('button', {
-                              key: 'install',
-                              type: 'button',
-                              className: 'dsh-pl-card-btn',
-                              disabled: busyKey === item.folder,
-                              onClick: (event) => {
-                                event.stopPropagation()
-                                void installFromPath(item)
-                              },
-                            }, busyKey === item.folder ? textOf(t, 'list.installing') : textOf(t, 'list.install'))
-                            : (() => {
-                              // 运行中/启动失败 → 可停用；已停用/已安装 → 可启动
-                              const running = state === 'active' || state === 'failed'
-                              return h('button', {
-                                key: 'toggle',
-                                type: 'button',
-                                className: `dsh-pl-card-btn${running ? '' : ' is-update'}`,
-                                disabled: busyKey === item.folder,
-                                onClick: (event) => {
-                                  event.stopPropagation()
-                                  void toggleScanned(item, !running)
-                                },
-                              }, busyKey === item.folder
-                                ? textOf(t, 'list.updating')
-                                : textOf(t, running ? 'list.disable' : 'list.enable'))
-                            })(),
-                          h('button', {
-                            key: 'reveal',
-                            type: 'button',
-                            className: 'dsh-pl-card-btn',
-                            onClick: (event) => {
-                              event.stopPropagation()
-                              if (typeof props.revealPackage === 'function') {
-                                void props.revealPackage({ moduleName: item.name || '', source: `link:${item.folder}` })
-                              }
-                            },
-                          }, textOf(t, 'list.reveal')),
-                        ].filter(Boolean),
+                        plugin,
+                        bundle,
+                        scan: item,
+                        name: item.name,
+                        installed,
+                        state,
                       })
                     })))
+      }
+
+      /** 打开某张卡片的操作菜单；位置贴着触发按钮，超出视口就往上翻。 */
+      function openCardMenu(event, title, items) {
+        event.stopPropagation()
+        const rect = event.currentTarget.getBoundingClientRect()
+        const width = 210
+        const height = Math.min(320, 44 + items.length * 34)
+        const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))
+        const below = rect.bottom + 6
+        const top = below + height > window.innerHeight - 8 ? Math.max(8, rect.top - height - 6) : below
+        setCardMenu({ title, items, left, top })
+      }
+
+      function closeCardMenu() {
+        setCardMenu(null)
+      }
+
+      /**
+       * 一张卡片的操作项。五个页面共用同一份，能力不会各处不一样：
+       * 启用/停用、更新、置顶、卸载、打开、打开所在位置、安装、体检报告。
+       */
+      function buildCardMenu(entry) {
+        const items = []
+        const { plugin, bundle, scan, name, installed, state } = entry
+
+        if (!installed) {
+          items.push({
+            key: 'install',
+            label: scan ? textOf(t, 'list.installFromLocal') : textOf(t, 'list.install'),
+            onClick: () => {
+              if (scan) void installFromPath(scan)
+              else void installFromMarket(name)
+            },
+          })
+        } else {
+          const running = state === 'active' || state === 'failed'
+          items.push({
+            key: 'toggle',
+            label: textOf(t, running ? 'list.disable' : 'list.enable'),
+            onClick: () => {
+              if (scan) void toggleScanned(scan, !running)
+              else void toggleInstalled(plugin, !running)
+            },
+          })
+
+          const info = bundle ? versionMap[bundle.name] : null
+          if (bundle && info && bundle.version && compareVersion(info.version, bundle.version) > 0) {
+            items.push({
+              key: 'update',
+              label: `${textOf(t, 'list.updateTo')} ${info.version}`,
+              onClick: () => { void runUpdate(bundle, info) },
+            })
+          }
+
+          if (plugin) {
+            const pinned = pins.includes(plugin.entryId)
+            items.push({
+              key: 'pin',
+              label: textOf(t, pinned ? 'list.unpin' : 'list.pin'),
+              onClick: () => togglePin(plugin.entryId),
+            })
+          }
+
+          if (bundle && bundle.removable && plugin) {
+            items.push({
+              key: 'remove',
+              label: textOf(t, 'list.remove'),
+              danger: true,
+              onClick: () => { void removePlugin(plugin, bundle) },
+            })
+          }
+
+          const kind = plugin ? tabKindFor(plugin, guide, localeId) : null
+          if (kind) {
+            items.push({
+              key: 'open',
+              label: textOf(t, 'list.open'),
+              onClick: () => { if (typeof openPanel === 'function') openPanel(kind) },
+            })
+          }
+        }
+
+        if (plugin) {
+          items.push({
+            key: 'reveal',
+            label: textOf(t, 'list.reveal'),
+            onClick: () => {
+              if (typeof props.revealPackage !== 'function') return
+              const source = bundle && bundle.source ? bundle.source : scan ? `link:${scan.folder}` : ''
+              void props.revealPackage({ moduleName: plugin.moduleName || name || '', source })
+            },
+          })
+        } else if (scan) {
+          items.push({
+            key: 'reveal',
+            label: textOf(t, 'list.reveal'),
+            onClick: () => {
+              if (typeof props.revealPackage !== 'function') return
+              void props.revealPackage({ moduleName: scan.name || '', source: `link:${scan.folder}` })
+            },
+          })
+        }
+
+        const diagnosis = plugin ? diagnoses[plugin.entryId] : null
+        const issues = diagnosis && diagnosis.level && diagnosis.level !== 'ok' && diagnosis.level !== 'unknown'
+          ? (diagnosis.items || []).filter((item) => item.level === 'bad' || item.level === 'warn').length
+          : 0
+        if (issues > 0) {
+          items.push({
+            key: 'health',
+            label: `${textOf(t, 'list.suggest')} ${issues}（${textOf(t, 'list.healthCopy')}）`,
+            onClick: () => { if (plugin) void copyDiagnosis(plugin, entry.title, diagnosis) },
+          })
+        }
+
+        return items
+      }
+
+      /** 统一卡片：面上只有图标、名字、副标题、状态和「操作」，其余都进菜单。 */
+      function unifiedCard(entry) {
+        const items = buildCardMenu(entry)
+        return h(PluginCard, {
+          key: entry.key,
+          icon: entry.iconUrl ? h('img', { src: entry.iconUrl, alt: '', draggable: false }) : null,
+          title: entry.title,
+          subtitle: entry.subtitle || '',
+          meta: entry.meta || null,
+          className: entry.className || '',
+          badge: entry.tag
+            ? h('span', { className: `dsh-pl-local-tag${entry.tagClass ? ' ' + entry.tagClass : ''}` }, entry.tag)
+            : null,
+          onClick: entry.onClick,
+          actions: [
+            h('button', {
+              key: 'menu',
+              type: 'button',
+              className: 'dsh-pl-card-btn',
+              onClick: (event) => openCardMenu(event, entry.title, items),
+            }, textOf(t, 'list.actions')),
+          ],
+        })
+      }
+
+      /** 已装插件的启停：条目级优先，只读时退回 bundle 级。 */
+      async function toggleInstalled(plugin, nextEnabled) {
+        if (!plugin || busyKey) return
+        setBusyKey(plugin.entryId)
+        try {
+          let result = null
+          if (plugin.patchId && plugin.readOnlyReason == null && typeof props.setPluginEnabled === 'function') {
+            result = await props.setPluginEnabled(plugin.entryId, nextEnabled)
+          } else {
+            const bundle = matchBundle(plugin, bundles)
+            if (bundle && typeof props.setBundleEnabled === 'function') {
+              result = await props.setBundleEnabled(bundle.name, nextEnabled)
+            }
+          }
+          if (!result) { setActionNote(textOf(t, 'list.toggleUnavailable')); return }
+          if (result.ok === false || (result.value && result.value.application === 'failed')) {
+            const error = (result.ok === false ? result.error : result.value.error) || {}
+            setActionNote(`${textOf(t, 'list.toggleFailed')}：${error.message || error.code || 'unknown'}`)
+            return
+          }
+          showToast(textOf(t, nextEnabled ? 'list.toggleOn' : 'list.toggleOff').replace('{name}', pluginTitle(plugin, localeId)))
+          setTimeout(() => { void load() }, 600)
+        } catch (failure) {
+          setActionNote(`${textOf(t, 'list.toggleFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        } finally {
+          setBusyKey('')
+        }
       }
 
       /** 列表 / 卡片切换：放在各个 tab 内部，而不是顶部全局。 */
@@ -3057,9 +3203,11 @@ window.__ModuleLoader__.load({
        * 没装的显示包名和简介，点开进市场详情。这样四个地方（已安装、精选、榜单、搜索）
        * 的卡片长得一样、点起来也一样。
        */
-      function marketCard(row, badge) {
+      function marketCard(row) {
         const plugin = plugins.find((p) => p.moduleName === row.name || p.patchId === row.name)
         const installed = Boolean(plugin)
+        const bundle = plugin ? matchBundle(plugin, bundles) : null
+        const state = installed ? pluginStateOf(plugin) : 'missing'
         const iconUrl = installed
           ? safeIcon(plugin.meta && plugin.meta.icon)
           : safeIcon(row.icon)
@@ -3068,23 +3216,41 @@ window.__ModuleLoader__.load({
             .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
             .join(' · ') || textOf(t, 'list.placeNone')
           : ''
-        const classes = [
-          installed && selectedId === plugin.entryId ? 'is-on' : '',
-          installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
-          installed ? '' : 'is-market',
-        ].filter(Boolean).join(' ')
-        return h(PluginCard, {
+        return unifiedCard({
           key: row.repo || row.name,
-          icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
+          iconUrl,
           title: installed ? pluginTitle(plugin, localeId) : row.name,
-          subtitle: installed ? places : (row.summary || row.categoryZh || row.category || ''),
-          className: classes,
-          badge: badge || null,
+          subtitle: installed
+            ? resolveText(plugin.meta && plugin.meta.description, localeId)
+            : (row.summary || row.categoryZh || row.category || ''),
+          meta: (() => {
+            const parts = []
+            if (row.version) parts.push(`v${row.version}`)
+            if (installed && places) parts.push(places)
+            if (typeof row.stars === 'number' && row.stars > 0) parts.push(`★ ${compactNumber(row.stars)}`)
+            const ago = relativeDay(row.publishedAt || row.date || '')
+            if (ago) parts.push(ago)
+            if (typeof row.delta === 'number' && row.delta > 0) parts.push(`+${compactNumber(row.delta)}`)
+            return parts
+          })(),
+          className: [
+            installed && selectedId === plugin.entryId ? 'is-on' : '',
+            installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
+            installed ? '' : 'is-market',
+          ].filter(Boolean).join(' '),
+          tag: installed
+            ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
+            : textOf(t, 'list.notInstalled'),
+          tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
           onClick: () => {
             if (installed) setSelectedId(plugin.entryId)
             else setSelectedMarket(row)
           },
-          actions: [hotAction(row)],
+          plugin,
+          bundle,
+          name: row.name,
+          installed,
+          state,
         })
       }
 
@@ -3099,37 +3265,38 @@ window.__ModuleLoader__.load({
             CURATED.map((item) => {
               const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
               const installed = Boolean(plugin)
+              const bundle = plugin ? matchBundle(plugin, bundles) : null
+              const state = installed ? pluginStateOf(plugin) : 'missing'
               const iconUrl = plugin ? safeIcon(plugin.meta && plugin.meta.icon) : ''
               const places = plugin
                 ? placesFor(plugin, guide, seats, localeId)
                   .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
                   .join(' · ') || textOf(t, 'list.placeNone')
-                : textOf(t, 'list.notInstalled')
-              return h(PluginCard, {
+                : ''
+              return unifiedCard({
                 key: item.name,
-                icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
+                iconUrl,
                 title: plugin ? pluginTitle(plugin, localeId) : item.title,
-                subtitle: places,
+                subtitle: installed ? places : (item.reason || ''),
+                meta: [bundle && bundle.version ? `v${bundle.version}` : '', installed ? places : ''].filter(Boolean),
                 className: [
                   plugin && selectedId === plugin.entryId ? 'is-on' : '',
                   plugin && pins.includes(plugin.entryId) ? 'is-pinned' : '',
+                  installed ? '' : 'is-market',
                 ].filter(Boolean).join(' '),
+                tag: installed
+                  ? textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')
+                  : textOf(t, 'list.notInstalled'),
+                tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
                 onClick: () => {
                   if (plugin) setSelectedId(plugin.entryId)
                   else setSelectedMarket({ name: item.name, title: item.title, summary: item.reason, remote: true })
                 },
-                actions: [
-                  h('button', {
-                    key: 'act',
-                    type: 'button',
-                    className: 'dsh-pl-card-btn',
-                    onClick: (event) => {
-                      event.stopPropagation()
-                      if (installed) return
-                      void installFromMarket(item.name)
-                    },
-                  }, installed ? textOf(t, 'list.installedState') : textOf(t, 'list.install')),
-                ],
+                plugin,
+                bundle,
+                name: item.name,
+                installed,
+                state,
               })
             })),
           h('p', { className: 'dsh-pl-note dsh-pl-featured-foot' }, textOf(t, 'list.featuredContact')))
@@ -3289,7 +3456,7 @@ window.__ModuleLoader__.load({
                               : null,
                             h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
                               remoteResult.map((row) => {
-                                const card = marketCard(row, row.version ? h('span', { className: 'dsh-pl-metric' }, `v${row.version}`) : null)
+                                const card = marketCard(row)
                                 // 远程结果点开时顺带补全元信息（体积、许可、仓库）
                                 const original = card.p.onClick
                                 card.p.onClick = () => {
@@ -3314,10 +3481,7 @@ window.__ModuleLoader__.load({
                         chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) })),
                       viewToggle()),
                     h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
-                      items.map((row) => {
-                        const metric = marketMetric(row)
-                        return marketCard(row, metric ? h('span', { className: 'dsh-pl-metric', title: metric.title }, metric.text) : null)
-                      }))),
+                      items.map((row) => marketCard(row)))),
                     pager)
         }
         return h('div', { className: 'dsh-pl-market' },
@@ -3383,6 +3547,19 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dsh-pl-toast-dot' }),
           h('span', null, toast)) : null,
         listNote ? h('p', { className: 'dsh-pl-note dsh-pl-list-note' }, listNote) : null,
+        cardMenu ? h('div', { className: 'dsh-pl-menu-layer', onClick: closeCardMenu },
+          h('div', {
+            className: 'dsh-pl-menu',
+            style: { left: `${cardMenu.left}px`, top: `${cardMenu.top}px` },
+            onClick: (event) => event.stopPropagation(),
+          },
+          h('div', { className: 'dsh-pl-menu-title' }, cardMenu.title),
+          cardMenu.items.map((item) => h('button', {
+            key: item.key,
+            type: 'button',
+            className: `dsh-pl-menu-item${item.danger ? ' is-danger' : ''}`,
+            onClick: () => { closeCardMenu(); item.onClick() },
+          }, item.label)))) : null,
         surface === 'about'
           ? aboutView()
           : surface === 'design'
@@ -3439,75 +3616,25 @@ window.__ModuleLoader__.load({
                         : installKind === 'tarball' ? textOf(t, 'list.localTagTarball')
                         : installKind ? textOf(t, 'list.localTag') : ''
                       const state = pluginStateOf(plugin)
-                      return h(PluginCard, {
+                      const intro = resolveText(plugin.meta && plugin.meta.description, localeId)
+                      return unifiedCard({
                         key: plugin.entryId,
-                        icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
+                        iconUrl,
                         title,
-                        subtitle: places,
+                        subtitle: intro,
+                        meta: [
+                          bundle && bundle.version ? `v${bundle.version}` : '',
+                          places,
+                        ].filter(Boolean),
                         className: classes,
-                        badge: h('span', { className: 'dsh-pl-badges' },
-                          h('span', { className: `dsh-pl-local-tag${state === 'failed' ? ' is-failed' : state === 'disabled' ? ' is-off' : ''}` },
-                            textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')),
-                          installTag ? h('span', { className: 'dsh-pl-local-tag' }, installTag) : null),
+                        tag: textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled'),
+                        tagClass: state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : '',
                         onClick: () => setSelectedId(plugin.entryId),
-                        actions: [
-                          healthChip(title, diagnoses[plugin.entryId], copiedKey === plugin.entryId, () => {
-                            void copyDiagnosis(plugin, title, diagnoses[plugin.entryId])
-                          }, t),
-                          (() => {
-                            const bundle = matchBundle(plugin, bundles)
-                            if (!bundle || !bundle.name) return null
-                            const info = versionMap[bundle.name]
-                            const current = bundle.version
-                            if (!info || !current || compareVersion(info.version, current) <= 0) return null
-                            return h('button', {
-                              key: 'update',
-                              type: 'button',
-                              className: 'dsh-pl-card-btn is-update',
-                              disabled: busyKey === bundle.name,
-                              onClick: (event) => {
-                                event.stopPropagation()
-                                void runUpdate(bundle, info)
-                              },
-                            }, busyKey === bundle.name
-                              ? textOf(t, 'list.updating')
-                              : `${textOf(t, 'list.updateTo')} ${info.version}`)
-                          })(),
-                          (() => {
-                            const bundle = matchBundle(plugin, bundles)
-                            if (!bundle || !bundle.removable) return null
-                            const confirming = removeConfirm === plugin.entryId
-                            return h('button', {
-                              key: 'remove',
-                              type: 'button',
-                              className: `dsh-pl-card-btn${confirming ? ' is-danger' : ''}`,
-                              onClick: (event) => {
-                                event.stopPropagation()
-                                if (confirming) void removePlugin(plugin, bundle)
-                                else setRemoveConfirm(plugin.entryId)
-                              },
-                            }, confirming ? textOf(t, 'list.confirmRemove') : textOf(t, 'list.remove'))
-                          })(),
-                          h('button', {
-                            key: 'pin',
-                            type: 'button',
-                            className: 'dsh-pl-card-btn',
-                            'aria-pressed': pinned,
-                            onClick: (event) => {
-                              event.stopPropagation()
-                              togglePin(plugin.entryId)
-                            },
-                          }, pinned ? textOf(t, 'list.unpin') : textOf(t, 'list.pin')),
-                          kind ? h('button', {
-                            key: 'open',
-                            type: 'button',
-                            className: 'dsh-pl-card-btn',
-                            onClick: (event) => {
-                              event.stopPropagation()
-                              if (typeof openPanel === 'function') openPanel(kind)
-                            },
-                          }, textOf(t, 'list.open')) : null,
-                        ],
+                        plugin,
+                        bundle,
+                        name: plugin.moduleName,
+                        installed: true,
+                        state,
                       })
                     }))))
     }
@@ -3653,6 +3780,13 @@ window.__ModuleLoader__.load({
 .dsh-pl-scan-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dsh-pl-scan-bar .dsh-pl-search { flex: 1 1 auto; margin: 0; }
 .dsh-pl-section-title { font-size: var(--pl-fs-md); font-weight: 600; color: var(--dsw-alias-label-primary); margin-right: auto; }
+.dsh-pl-menu-layer { position: fixed; inset: 0; z-index: 40; }
+.dsh-pl-menu { position: fixed; z-index: 41; min-width: 190px; max-width: 240px; padding: 6px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); display: flex; flex-direction: column; gap: 2px; }
+.dsh-pl-menu-title { padding: 6px 10px 8px; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); border-bottom: 1px solid var(--dsw-alias-border-l1); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-pl-menu-item { text-align: left; padding: 8px 10px; border: 0; border-radius: var(--pl-radius-chip); background: transparent; color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); cursor: pointer; }
+.dsh-pl-menu-item:hover { background: var(--dsw-alias-bg-layer-2); }
+.dsh-pl-menu-item.is-danger { color: var(--dsw-alias-state-error-primary); }
+.dsh-pl-meta { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
 .dsh-pl-badges { display: inline-flex; align-items: center; gap: 4px; }
 .dsh-pl-local-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-local-tag.is-off { color: var(--dsw-alias-state-warn-label); }
