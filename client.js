@@ -167,6 +167,8 @@ window.__ModuleLoader__.load({
         'list.package': '包名',
         'list.version': '版本',
         'list.source': '来源',
+        'list.path': '路径',
+        'list.localPath': '本地路径',
         'list.installNpm': 'npm 安装',
         'list.installLink': '本地开发（软链）',
         'list.installFile': '本地文件',
@@ -380,6 +382,8 @@ window.__ModuleLoader__.load({
         'list.package': 'Package',
         'list.version': 'Version',
         'list.source': 'Source',
+        'list.path': 'Path',
+        'list.localPath': 'Local path',
         'list.installNpm': 'npm',
         'list.installLink': 'Local dev (link)',
         'list.installFile': 'Local file',
@@ -2093,6 +2097,7 @@ window.__ModuleLoader__.load({
       const [scanStatus, setScanStatus] = React.useState('')
       const [scanError, setScanError] = React.useState('')
       const [cardMenu, setCardMenu] = React.useState(null)
+      const [selectedScan, setSelectedScan] = React.useState(null)
       const [remoteResult, setRemoteResult] = React.useState(null)
       const [remoteStatus, setRemoteStatus] = React.useState('')
       const [remoteAdded, setRemoteAdded] = React.useState(0)
@@ -2411,101 +2416,172 @@ window.__ModuleLoader__.load({
         return raw || textOf(t, 'list.revealFailed')
       }
 
-      function detailAside(plugin) {
-        const title = pluginTitle(plugin, localeId)
-        const icon = safeIcon(plugin.meta && plugin.meta.icon)
+      /**
+       * 详情页内容的**唯一**来源：已装插件、市场行、扫描项都归一到这里。
+       * 事实的顺序、动作按钮、文档位置由此决定，三个入口不会再长得不一样。
+       */
+      function detailEntry(input) {
+        const { plugin = null, row = null, scan = null } = input || {}
+        const installed = Boolean(plugin)
+        const bundle = installed ? (selectedBundle || matchBundle(plugin, bundles)) : null
         const manifest = facts && facts.manifest
-        const intro = resolveText(plugin.meta && plugin.meta.description, localeId)
-          || (manifest && manifest.summary)
-          || (selectedBundle && selectedBundle.description)
-          || ''
-        const place = selectedBundle && selectedBundle.availability === 'profile'
-          ? textOf(t, 'list.placeProfile')
-          : selectedBundle && selectedBundle.availability === 'installation'
-            ? textOf(t, 'list.placeInstallation')
-            : ''
-        const source = (selectedBundle && selectedBundle.source) || place
-        const flags = [
-          selectedBundle && selectedBundle.official ? textOf(t, 'list.official') : '',
-          selectedBundle && selectedBundle.optional ? textOf(t, 'list.optional') : '',
-          selectedBundle ? (selectedBundle.removable ? textOf(t, 'list.removable') : textOf(t, 'list.fixed')) : '',
-        ].filter(Boolean).join(' · ')
-        const rows = selectedBundle && Array.isArray(selectedBundle.rows) ? selectedBundle.rows : []
-        const siblings = rows
-          .filter((row) => row && row.entryId !== plugin.entryId)
-          .slice(0, 6)
-          .map((row) => shortModule(row.moduleName) || row.rowId)
-          .filter(Boolean)
-        const componentText = rows.length
-          ? `${rows.length}${siblings.length ? ` · ${siblings.join('、')}${rows.length > 7 ? '…' : ''}` : ''}`
-          : ''
-        const detailFacts = [
-          { label: textOf(t, 'list.intro'), value: intro || textOf(t, 'list.unknown') },
-          { label: textOf(t, 'list.module'), value: shortModule(plugin.moduleName) },
-          { label: textOf(t, 'list.entry'), value: plugin.entryId },
-          { label: textOf(t, 'list.status'), value: textOf(t, phaseKey(plugin)) },
-          { label: textOf(t, 'list.package'), value: (manifest && manifest.name) || (selectedBundle && selectedBundle.name) || shortModule(plugin.moduleName) },
-          { label: textOf(t, 'list.version'), value: (manifest && manifest.version) || (selectedBundle && selectedBundle.version) },
-          { label: textOf(t, 'list.place'), value: place },
-          { label: textOf(t, 'list.source'), value: installSourceText(selectedBundle, t) },
-          { label: textOf(t, 'list.flags'), value: flags },
-          { label: textOf(t, 'list.components'), value: componentText },
-          { label: textOf(t, 'list.license'), value: manifest && manifest.license },
-          { label: textOf(t, 'list.size'), value: facts && facts.size ? formatSize(facts.size.bytes, facts.size.files, t) : '' },
-          { label: textOf(t, 'list.repo'), value: repoLinkOf(manifest && manifest.repository) },
-          { label: textOf(t, 'list.engines'), value: manifest && manifest.engines },
-          { label: textOf(t, 'list.keywords'), value: manifest && Array.isArray(manifest.keywords) ? manifest.keywords.join('、') : '' },
-          { label: textOf(t, 'list.inject'), value: manifest && Array.isArray(manifest.clientInject) ? manifest.clientInject.join('、') : '' },
-        ]
+        const icon = installed
+          ? safeIcon(plugin && plugin.meta && plugin.meta.icon)
+          : safeIcon(row && row.icon)
+        const title = installed
+          ? pluginTitle(plugin, localeId)
+          : scan ? (scan.title || scan.name) : (row && row.name) || ''
 
-        const detailActions = []
-        const openKind = tabKindFor(plugin, guide, localeId)
+        const f = {}
+        if (installed) {
+          f.intro = resolveText(plugin.meta && plugin.meta.description, localeId)
+            || (manifest && manifest.summary)
+            || (bundle && bundle.description)
+            || ''
+          f.module = shortModule(plugin.moduleName)
+          f.entry = plugin.entryId
+          f.status = textOf(t, phaseKey(plugin))
+          f.package = (manifest && manifest.name) || (bundle && bundle.name) || shortModule(plugin.moduleName)
+          f.version = (manifest && manifest.version) || (bundle && bundle.version)
+          f.place = bundle && bundle.availability === 'profile'
+            ? textOf(t, 'list.placeProfile')
+            : bundle && bundle.availability === 'installation' ? textOf(t, 'list.placeInstallation') : ''
+          f.source = installSourceText(bundle, t)
+          f.flags = [
+            bundle && bundle.official ? textOf(t, 'list.official') : '',
+            bundle && bundle.optional ? textOf(t, 'list.optional') : '',
+            bundle ? (bundle.removable ? textOf(t, 'list.removable') : textOf(t, 'list.fixed')) : '',
+          ].filter(Boolean).join(' · ')
+          const bundleRows = bundle && Array.isArray(bundle.rows) ? bundle.rows : []
+          const siblings = bundleRows
+            .filter((item) => item && item.entryId !== plugin.entryId)
+            .slice(0, 6)
+            .map((item) => shortModule(item.moduleName) || item.rowId)
+            .filter(Boolean)
+          f.components = bundleRows.length
+            ? `${bundleRows.length}${siblings.length ? ` · ${siblings.join('、')}${bundleRows.length > 7 ? '…' : ''}` : ''}`
+            : ''
+          f.license = manifest && manifest.license
+          f.size = facts && facts.size ? formatSize(facts.size.bytes, facts.size.files, t) : ''
+          f.repo = repoLinkOf(manifest && manifest.repository)
+          f.engines = manifest && manifest.engines
+          f.keywords = manifest && Array.isArray(manifest.keywords) ? manifest.keywords.join('、') : ''
+          f.inject = manifest && Array.isArray(manifest.clientInject) ? manifest.clientInject.join('、') : ''
+        } else if (scan) {
+          f.intro = scan.description || ''
+          f.status = textOf(t, scan.state === 'active' ? 'list.stateActive'
+            : scan.state === 'disabled' ? 'list.stateDisabled'
+            : scan.state === 'failed' ? 'list.stateFailed'
+            : scan.installed ? 'list.stateInactive' : 'list.notInstalled')
+          f.package = scan.name
+          f.version = scan.version
+          f.path = scan.folder
+          f.source = bundle ? installSourceText(bundle, t) : textOf(t, 'list.localPath')
+        } else if (row) {
+          f.intro = row.summary || ''
+          f.status = textOf(t, isInstalled(row.name) ? 'list.installedState' : 'list.notInstalled')
+          f.package = row.name
+          f.version = row.version
+          f.stars = typeof row.stars === 'number' ? row.stars.toLocaleString() : ''
+          f.delta = typeof row.delta === 'number' ? `+${row.delta.toLocaleString()}` : ''
+          f.category = row.categoryZh || row.category || ''
+          f.repo = row.repo ? repoLinkOf(row.repo) : ''
+          f.license = row.license || ''
+          f.size = row.unpackedSize ? formatSize(row.unpackedSize, row.fileCount, t) : ''
+          f.source = row.remote ? textOf(t, 'list.remoteSource') : ''
+        }
+
+        const order = ['intro', 'module', 'entry', 'status', 'package', 'version', 'place', 'path',
+          'source', 'flags', 'components', 'license', 'size', 'repo', 'engines', 'keywords', 'inject',
+          'stars', 'delta', 'category']
+        const labelKeys = {
+          intro: 'list.intro', module: 'list.module', entry: 'list.entry', status: 'list.status',
+          package: 'list.package', version: 'list.version', place: 'list.place', path: 'list.path',
+          source: 'list.source', flags: 'list.flags', components: 'list.components',
+          license: 'list.license', size: 'list.size', repo: 'list.repo', engines: 'list.engines',
+          keywords: 'list.keywords', inject: 'list.inject', stars: 'list.hotStars',
+          delta: 'list.hotDelta', category: 'list.hotCategory',
+        }
+        const detailFacts = order
+          .map((key) => ({ label: textOf(t, labelKeys[key]), value: f[key] }))
+          .filter((item) => item.value)
+
+        const button = (key, label, onClick) => h('button', { key, type: 'button', onClick }, label)
+        const actions = []
+        const openKind = installed ? tabKindFor(plugin, guide, localeId) : null
         if (openKind && typeof openPanel === 'function') {
-          detailActions.push(h('button', {
-            key: 'open',
-            type: 'button',
-            onClick: () => openPanel(openKind),
-          }, textOf(t, 'list.open')))
+          actions.push(button('open', textOf(t, 'list.open'), () => openPanel(openKind)))
         }
         if (typeof props.revealPackage === 'function') {
-          detailActions.push(h('button', {
-            key: 'reveal',
-            type: 'button',
-            onClick: () => {
-              setRevealNote('')
-              const source = selectedBundle && selectedBundle.source
-              Promise.resolve(props.revealPackage({ moduleName: plugin.moduleName || '', source: source || '' })).then((result) => {
+          actions.push(button('reveal', textOf(t, 'list.reveal'), () => {
+            setRevealNote('')
+            const source = (bundle && bundle.source) || (scan ? `link:${scan.folder}` : '')
+            Promise.resolve(props.revealPackage({ moduleName: plugin ? (plugin.moduleName || '') : (scan ? scan.name : ''), source }))
+              .then((result) => {
                 if (result && result.ok === false) setRevealNote(revealHint(result.error && result.error.message))
-              }).catch((failure) => {
-                setRevealNote(revealHint(failure instanceof Error ? failure.message : ''))
               })
-            },
-          }, textOf(t, 'list.reveal')))
+              .catch((failure) => setRevealNote(revealHint(failure instanceof Error ? failure.message : '')))
+          }))
         }
-        if (plugin.patchId && plugin.readOnlyReason == null && setPluginEnabled) {
-          detailActions.push(h('button', {
-            key: 'toggle',
-            type: 'button',
-            onClick: () => { void setPluginEnabled(plugin.entryId, plugin.enabled !== true).then(() => load()) },
-          }, plugin.enabled ? textOf(t, 'list.disable') : textOf(t, 'list.enable')))
+        if (installed && plugin.patchId && plugin.readOnlyReason == null && setPluginEnabled) {
+          actions.push(button('toggle', textOf(t, plugin.enabled ? 'list.disable' : 'list.enable'), () => {
+            void toggleInstalled(plugin, plugin.enabled !== true)
+          }))
         }
-        if (revealNote) detailActions.push(h('span', { key: 'note', className: 'dsh-pl-note' }, revealNote))
-        if (plugin.readOnlyReason) detailActions.push(h('span', { key: 'locked', className: 'dsh-pl-note' }, String(plugin.readOnlyReason)))
+        if (installed) {
+          actions.push(button('pin', textOf(t, pins.includes(plugin.entryId) ? 'list.unpin' : 'list.pin'), () => togglePin(plugin.entryId)))
+        }
+        if (!installed && row) {
+          actions.push(button('install', textOf(t, 'list.install'), () => { void installFromMarket(row.name) }))
+        }
+        if (!installed && scan) {
+          actions.push(button('install', textOf(t, 'list.installFromLocal'), () => { void installFromPath(scan) }))
+        }
+        if (revealNote) actions.push(h('span', { key: 'note', className: 'dsh-pl-note' }, revealNote))
+        if (installed && plugin.readOnlyReason) {
+          actions.push(h('span', { key: 'locked', className: 'dsh-pl-note' }, String(plugin.readOnlyReason)))
+        }
 
-        return h(DetailPanel, {
-          icon: icon ? h('img', { src: icon, alt: '' }) : null,
-          title,
-          closeLabel: textOf(t, 'list.close'),
-          onClose: () => setSelectedId(''),
-          facts: detailFacts,
-          actions: detailActions,
-          children: h('section', { className: 'dsh-pl-doc-block' },
+        const doc = installed
+          ? h('section', { className: 'dsh-pl-doc-block' },
             h('div', { className: 'dsh-pl-fact-label' }, textOf(t, 'list.doc')),
             readmeStatus === 'loading'
               ? h('p', null, textOf(t, 'list.docLoading'))
               : (readme || (facts && facts.document))
                 ? markdownView(readme || facts.document)
-                : h('p', null, textOf(t, 'list.docEmpty'))),
+                : h('p', null, textOf(t, 'list.docEmpty')))
+          : null
+
+        return {
+          icon,
+          title,
+          facts: detailFacts,
+          tags: row && Array.isArray(row.keywords) ? row.keywords : null,
+          note: row ? (row.summary || '') : '',
+          actions,
+          doc,
+          onClose: () => {
+            setSelectedId('')
+            setSelectedMarket(null)
+            setSelectedScan(null)
+          },
+        }
+      }
+
+      /** 详情：一个组件，三个入口共用。 */
+      function pluginDetail(input) {
+        const entry = detailEntry(input)
+        return h(DetailPanel, {
+          icon: entry.icon ? h('img', { src: entry.icon, alt: '' }) : null,
+          title: entry.title,
+          closeLabel: textOf(t, 'list.close'),
+          onClose: entry.onClose,
+          facts: entry.facts,
+          tags: entry.tags,
+          tagLabel: textOf(t, 'list.tags'),
+          note: entry.note,
+          actions: entry.actions,
+          children: entry.doc,
         })
       }
 
@@ -3192,6 +3268,7 @@ window.__ModuleLoader__.load({
         if (installed) onClick = () => setSelectedId(plugin.entryId)
         else if (curated) onClick = () => setSelectedMarket({ name: curated.name, title: curated.title, summary: curated.reason, remote: true })
         else if (row) onClick = () => setSelectedMarket(row)
+        else if (scan) onClick = () => setSelectedScan(scan)
 
         return {
           key: installed ? plugin.entryId : (scan ? scan.folder : name),
@@ -3401,35 +3478,7 @@ window.__ModuleLoader__.load({
       }
 
       function marketDetail(row) {
-        const installed = isInstalled(row.name)
-        const facts = [
-          typeof row.delta === 'number'
-            ? { label: textOf(t, 'list.hotDelta'), value: `+${row.delta.toLocaleString()}` }
-            : null,
-          typeof row.stars === 'number'
-            ? { label: textOf(t, 'list.hotStars'), value: row.stars.toLocaleString() }
-            : null,
-          row.version ? { label: textOf(t, 'list.version'), value: row.version } : null,
-          row.categoryZh || row.category ? { label: textOf(t, 'list.hotCategory'), value: row.categoryZh || row.category } : null,
-          row.repo ? { label: textOf(t, 'list.hotRepo'), value: repoLinkOf(row.repo) } : null,
-          row.license ? { label: textOf(t, 'list.license'), value: row.license } : null,
-          row.unpackedSize ? { label: textOf(t, 'list.sizeUnpacked'), value: formatSize(row.unpackedSize, row.fileCount, t) } : null,
-          row.remote ? { label: textOf(t, 'list.source'), value: textOf(t, 'list.remoteSource') } : null,
-          { label: textOf(t, 'list.status'), value: installed ? textOf(t, 'list.installedState') : textOf(t, 'list.notInstalled') },
-        ].filter(Boolean)
-        return h(DetailPanel, {
-          title: row.name,
-          closeLabel: textOf(t, 'list.close'),
-          onClose: () => setSelectedMarket(null),
-          facts,
-          tags: Array.isArray(row.keywords) ? row.keywords : [],
-          tagLabel: textOf(t, 'list.tags'),
-          note: row.summary || '',
-          actions: [
-            hotAction(row),
-            actionNote ? h('span', { key: 'note', className: 'dsh-pl-note' }, actionNote) : null,
-          ].filter(Boolean),
-        })
+        return pluginDetail({ row })
       }
 
       function marketView() {
@@ -3616,9 +3665,9 @@ window.__ModuleLoader__.load({
           : surface === 'design'
           ? designView()
           : surface === 'featured'
-          ? selected ? detailAside(selected) : selectedMarket ? marketDetail(selectedMarket) : featuredView()
+          ? selected ? pluginDetail({ plugin: selected }) : selectedMarket ? pluginDetail({ row: selectedMarket }) : selectedScan ? pluginDetail({ scan: selectedScan, plugin: plugins.find((p) => p.moduleName === selectedScan.name) }) : featuredView()
           : surface === 'market'
-          ? selected ? detailAside(selected) : selectedMarket ? marketDetail(selectedMarket) : marketView()
+          ? selected ? pluginDetail({ plugin: selected }) : selectedMarket ? pluginDetail({ row: selectedMarket }) : selectedScan ? pluginDetail({ scan: selectedScan, plugin: plugins.find((p) => p.moduleName === selectedScan.name) }) : marketView()
           : status === 'loading' && plugins.length === 0
           ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.loading'))
           : status === 'unavailable'
@@ -3628,7 +3677,7 @@ window.__ModuleLoader__.load({
                 h('p', null, error || textOf(t, 'list.error')),
                 h('button', { type: 'button', onClick: () => { void load() } }, textOf(t, 'list.retry')))
               : selected
-                ? detailAside(selected)
+                ? pluginDetail({ plugin: selected })
                 : h('div', { className: 'dsh-pl-surface' },
                 h('div', { className: 'dsh-pl-subtabs', role: 'tablist', 'aria-label': 'installed scope' },
                   [['installed', textOf(t, 'list.installed')], ['builtin', textOf(t, 'list.builtin')], ['scan', textOf(t, 'list.scanTab')]].map(([id, label]) => {
@@ -3777,6 +3826,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-item.is-failed { border-color: var(--dsw-alias-state-error-primary); }
 .dsh-pl-state { margin: 16px; color: var(--dsw-alias-label-secondary); }
 .dsh-pl-detail { flex: 1 1 auto; width: auto; max-width: none; min-width: 0; min-height: 0; overflow: auto; background: var(--dsw-alias-bg-base); padding: 12px 16px 20px; }
+.dsh-pl-detail, .dsh-pl-detail * { box-sizing: border-box; }
 .dsh-pl-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .dsh-pl-detail-head strong { flex: 1 1 auto; min-width: 0; font-size: var(--pl-fs-title); line-height: 1.35; overflow-wrap: anywhere; }
 .dsh-pl-detail-head button { flex: none; white-space: nowrap; align-self: flex-start; }
