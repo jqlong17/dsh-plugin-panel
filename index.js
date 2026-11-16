@@ -87,6 +87,20 @@ export function apply(ctx) {
     scoped.effect(() => registerDetailRpc(scoped, { tools, pluginManager }), 'plugin-canvas: detail rpc')
     // 移动端：一次性 token + 移动版页面 + 聚合接口
     scoped.effect(() => registerMobile(scoped, { pluginManager }), 'plugin-canvas: mobile routes')
+    // 移动端接入诊断：把 scripts/check-plugin-mobile.mjs 的判断暴露成工具，
+    // 这样别的插件维护者（或智能体）能直接调，不用自己拼 curl。
+    //
+    // **必须在 effect 里 try/catch**：工具注册失败（比如运行时对 defineTool
+    // 的校验更严）不能连累整个插件的路由注册——2026-11-16 就因为这里抛错，
+    // 整个插件没起来，所有路由 405，排查了很久。
+    scoped.effect(() => {
+      try {
+        return registerMobileCheckTool(scoped, { pluginManager })
+      } catch (error) {
+        mobileLog(`mobile check tool 注册失败（不影响其它功能）: ${error instanceof Error ? error.message : String(error)}`)
+        return () => {}
+      }
+    }, 'plugin-canvas: mobile check tool')
   })
 }
 
@@ -471,6 +485,90 @@ const TOGGLE_SCRIPT = `<script>
 })();
 </script>`
 
+/**
+ * 移动端接入诊断工具。
+ *
+ * 为什么复用 scripts/check-plugin-mobile.mjs 而不是在 JS 里重写一遍：
+ * 那个脚本要能独立跑（CI、本地、别人没装 DSH），两边逻辑必须一致，
+ * 所以这里直接 spawn 它、把 JSON 输出翻译成工具结果。
+ */
+function registerMobileCheckTool(ctx, services) {
+  if (!ctx.tools || typeof ctx.tools.register !== 'function') return () => {}
+  return ctx.tools.register({
+    name: 'plugin_check_mobile',
+    description:
+      'Diagnose whether a DSH plugin is correctly wired for the DSH Pocket iOS plugin panel. '
+      + 'Checks the dsh.mobile manifest, route registration and imports, token rules, template placeholders, '
+      + 'and media channel auth. Pass a plugin directory (e.g. /Users/me/projects/dsh-plugins/my-plugin). '
+      + 'Returns per-check pass/fail with the fix hint.',
+    parameters: {
+      dir: { type: 'string', description: 'The plugin directory to diagnose.' },
+    },
+    // DSH 要求工具声明输出形状（dsh-tools/lib/index.js:436）：
+    //   must declare output { schema, render, presentationMeta? }
+    // schema 用参数式 spec（和 parameters 同一套），render 把结果转成给模型看的文本。
+    output: {
+      schema: {
+        ok: { type: 'boolean', description: 'All checks passed.' },
+        summary: { type: 'string', description: 'One-line result.' },
+        results: {
+          type: 'array',
+          description: 'Per-check results.',
+          items: {
+            type: 'object',
+            properties: {
+              level: { type: 'string' },
+              id: { type: 'string' },
+              ok: { type: 'boolean' },
+              detail: { type: 'string' },
+              hint: { type: 'string' },
+            },
+          },
+        },
+        error: { type: 'string' },
+      },
+      render(_args, value) {
+        if (value?.error) return `诊断失败：${value.error}`
+        const lines = [value?.summary ?? '']
+        for (const item of value?.results ?? []) {
+          const mark = item.ok ? '✓' : item.level === 'error' ? '✗' : '!'
+          lines.push(`${mark} ${item.id} — ${item.detail}`)
+          if (!item.ok && item.hint) lines.push(`    ↳ ${item.hint}`)
+        }
+        return lines.join('\n')
+      },
+    },
+    async execute({ dir }) {
+      const target = typeof dir === 'string' ? dir.trim() : ''
+      if (!target) return { ok: false, error: 'dir is required' }
+      const script = path.join(SELF_DIR, 'scripts', 'check-plugin-mobile.mjs')
+      if (!existsSync(script)) return { ok: false, error: `诊断脚本缺失: ${script}` }
+      const output = await new Promise((resolve) => {
+        const child = spawn(process.execPath, [script, target, '--json'], { stdio: ['ignore', 'pipe', 'pipe'] })
+        let out = ''
+        let err = ''
+        child.stdout.on('data', (chunk) => { out += chunk })
+        child.stderr.on('data', (chunk) => { err += chunk })
+        child.on('close', () => resolve({ out, err }))
+        child.on('error', (error) => resolve({ out: '', err: error.message }))
+      })
+      try {
+        const parsed = JSON.parse(output.out)
+        const failed = (parsed.results ?? []).filter((r) => !r.ok)
+        return {
+          ok: parsed.ok === true,
+          summary: parsed.ok
+            ? `通过：${parsed.results.length} 项检查全部满足`
+            : `${failed.length} 项不满足：${failed.map((r) => r.id).join('、')}`,
+          results: parsed.results,
+        }
+      } catch {
+        return { ok: false, error: output.err || output.out || '诊断脚本没有返回 JSON' }
+      }
+    },
+  })
+}
+
 function registerMobile(ctx, services) {
   return ctx.webServer.register({
     kind: 'prefix',
@@ -510,6 +608,11 @@ function registerMobile(ctx, services) {
         const name = typeof payload.name === 'string' ? payload.name : ''
         const enabled = payload.enabled === true
         if (!name) return send(400, 'missing name')
+        // **不能自己关自己**：禁用它之后，这条 toggle 路由连同整个插件一起消失，
+        // 再也调不回来（2026-11-16 踩到，只能手工改 cordis.patch.yml 再重启 DSH）。
+        if (name === 'dsh-plugin-panel' && !enabled) {
+          return send(409, '不能关闭插件管理自身：关掉之后这个开关也会消失')
+        }
         try {
           const states = await readPluginStates(services.pluginManager)
           const entryId = states.get(name)?.entryId || `include:${name}`
