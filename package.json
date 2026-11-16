@@ -25,7 +25,8 @@
     "docs/screenshot-trend.jpg",
     "docs/screenshot-daily.jpg",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "templates"
   ],
   "dsh": {
     "bundle": {

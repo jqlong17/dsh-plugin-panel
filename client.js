@@ -1408,13 +1408,18 @@ window.__ModuleLoader__.load({
       '- [ ] 跑过 `check-plugin-mobile.mjs`，0 错误',
       '- [ ] 截图看过',
       '',
-      '## 七、参考实现',
+      '## 七、起步模板',
       '',
-      '`~/projects/dsh-plugins/dsh-音频解析/`',
+      '插件自带一份最小可用的骨架，复制改名即可：',
       '',
-      '- `src/mobile.ts` — 移动页面 + token + 四类媒体 + tab 切换',
-      '- `src/media.ts` — 媒体通道（已加 token 支持）',
-      '- `src/index.ts` — apply 里接入 registerMobile',
+      '```',
+      'node_modules/dsh-plugin-panel/templates/mobile-plugin/',
+      '```',
+      '',
+      '- `mobile.ts` — 路由 + token + 页面骨架（可直接跑起来）',
+      '- `README.md` — 复制步骤、要改的三处名字、两条必须遵守的规则',
+      '',
+      '复制后用诊断脚本自查，0 错误再接真实数据。',
     ].join('\n')
 
     /** 三段场景规范；`id` 用于复制态的区分。 */
