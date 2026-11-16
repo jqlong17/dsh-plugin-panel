@@ -1527,7 +1527,7 @@ window.__ModuleLoader__.load({
       '| 视图 | 规则 |',
       '| --- | --- |',
       '| 卡片 | `aspect-ratio: 3 / 4`（竖版），`grid-template-columns: repeat(auto-fill, minmax(148px, 1fr))` |',
-      '| 列表 | 最小高度 `68px`，一行一个 |',
+      '| 列表 | **固定高度 104px**，一行一个；简介只有一行时也占同样的高度 |',
       '',
       '比例锁死的好处是：内容多寡不影响卡片高度，一屏永远整齐。',
       '',
@@ -3700,7 +3700,9 @@ window.__ModuleLoader__.load({
   overflow: hidden;
 }
 .dsh-pl-grid:not(.is-card) .dsh-pl-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dsh-pl-grid:not(.is-card) .dsh-pl-item { min-height: 68px; }
+/* 列表行固定高度：简介最多两行，只有一行时也占同样的高度，整列才整齐 */
+.dsh-pl-grid:not(.is-card) .dsh-pl-item { height: 104px; min-height: 0; align-items: center; }
+.dsh-pl-grid:not(.is-card) .dsh-pl-copy { overflow: hidden; }
 .dsh-pl-grid.is-card { display: grid; grid-template-columns: repeat(auto-fill, 168px); justify-content: start; gap: 10px; align-items: stretch; }
 .dsh-pl-grid.is-card .dsh-pl-item {
   padding: 12px;
