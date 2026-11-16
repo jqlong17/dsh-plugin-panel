@@ -707,7 +707,15 @@ function readIfExists(file, fallback) {
 
 function renderMobilePage(bundles, token, states = new Map(), acceptLanguage = '') {
   const paths = mobilePaths()
-  const items = bundles.map((bundle) => {
+  // 手机屏幕小，只列「用户自己装的、而且启用着」的插件。
+  // 判定和桌面端一致：包名以 @deepseek-ai/ 开头的是 DSH 自带的，不列；
+  // cordis: 开头的是内核内置条目，也不列。
+  const visible = bundles.filter((bundle) => {
+    if (!bundle || typeof bundle.name !== 'string') return false
+    if (bundle.name.startsWith('@deepseek-ai/') || bundle.name.startsWith('cordis:')) return false
+    return bundle.enabled !== false
+  })
+  const items = visible.map((bundle) => {
     const moduleName = String(bundle.name ?? '')
     const version = escapeHtml(bundle.version ?? '')
     const { description, detail, title } = readBundleTexts(moduleName, acceptLanguage)
@@ -754,9 +762,9 @@ function renderMobilePage(bundles, token, states = new Map(), acceptLanguage = '
   )
   return template
     .replaceAll('{{TITLE}}', escapeHtml('插件'))
-    .replaceAll('{{COUNT}}', String(bundles.length))
-    .replaceAll('{{ITEMS}}', items || '<p class="empty">还没有安装任何插件</p>')
-    .replaceAll('{{NOTE}}', '这是插件的移动版页面。桌面端的完整管理在右侧栏；标题、文案和配色改了之后刷新即可，不用重启。')
+    .replaceAll('{{COUNT}}', String(visible.length))
+    .replaceAll('{{ITEMS}}', items || '<p class="empty">还没有安装任何启用的插件</p>')
+    .replaceAll('{{NOTE}}', '只显示你自己安装、并且启用着的插件。停用的和 DSH 自带的都不在这里，去桌面端右侧栏可以看全部。')
     .replaceAll('{{TOGGLE_SCRIPT}}', TOGGLE_SCRIPT)
     .replaceAll('{{TOKEN}}', escapeHtml(token ?? ''))
     .replaceAll('{{TOKEN_JSON}}', JSON.stringify(String(token ?? '')))
