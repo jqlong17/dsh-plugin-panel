@@ -1953,6 +1953,22 @@ window.__ModuleLoader__.load({
 
 
     /** One card shape, shared by the plugin list and the market ranking. */
+    /** 置顶标记：一个图钉，和状态标并排，不再用左边线。 */
+    function PinMark() {
+      return h('svg', {
+        className: 'dsh-pl-pin',
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 1.8,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+        'aria-hidden': 'true',
+      },
+      h('path', { d: 'M9 4h6l-1.5 5.5L17 13H7l3.5-3.5L9 4z' }),
+      h('path', { d: 'M12 13v7' }))
+    }
+
     function PluginCard(options) {
       const { icon, title, subtitle, meta, actions, className, onClick, badge } = options
       const classes = ['dsh-pl-item']
@@ -3185,10 +3201,8 @@ window.__ModuleLoader__.load({
           meta,
           tag,
           tagClass,
-          className: [
-            installed && selectedId === plugin.entryId ? 'is-on' : '',
-            installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
-          ].filter(Boolean).join(' '),
+          className: installed && selectedId === plugin.entryId ? 'is-on' : '',
+          pinned: Boolean(installed && pins.includes(plugin.entryId)),
           onClick,
           plugin,
           bundle,
@@ -3209,9 +3223,11 @@ window.__ModuleLoader__.load({
           subtitle: entry.subtitle || '',
           meta: entry.meta || null,
           className: entry.className || '',
-          badge: entry.tag
-            ? h('span', { className: `dsh-pl-local-tag${entry.tagClass ? ' ' + entry.tagClass : ''}` }, entry.tag)
-            : null,
+          badge: h('span', { className: 'dsh-pl-badges' },
+            entry.pinned ? h(PinMark, { key: 'pin' }) : null,
+            entry.tag
+              ? h('span', { className: `dsh-pl-local-tag${entry.tagClass ? ' ' + entry.tagClass : ''}` }, entry.tag)
+              : null),
           onClick: entry.onClick,
           actions: [
             h('button', {
@@ -3632,24 +3648,6 @@ window.__ModuleLoader__.load({
                   visible.length === 0
                     ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.empty'))
                     : visible.map((plugin) => {
-                      const title = pluginTitle(plugin, localeId)
-                      const iconUrl = safeIcon(plugin.meta && plugin.meta.icon)
-                      const kind = tabKindFor(plugin, guide, localeId)
-                      const pinned = pins.includes(plugin.entryId)
-                      const places = placesFor(plugin, guide, seats, localeId)
-                        .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
-                        .join(' · ') || textOf(t, 'list.placeNone')
-                      const classes = [
-                        selectedId === plugin.entryId ? 'is-on' : '',
-                        pinned ? 'is-pinned' : '',
-                        plugin.fiberPhase === 'failed' ? 'is-failed' : '',
-                      ].filter(Boolean).join(' ')
-                      const bundle = matchBundle(plugin, bundles)
-                      const installKind = bundle ? installSourceOf(bundle).kind : ''
-                      const installTag = installKind === 'npm' ? textOf(t, 'list.localTagNpm')
-                        : installKind === 'git' ? textOf(t, 'list.localTagGit')
-                        : installKind === 'tarball' ? textOf(t, 'list.localTagTarball')
-                        : installKind ? textOf(t, 'list.localTag') : ''
                       return unifiedCard(cardEntry({ plugin }))
                     }))))
     }
@@ -3718,23 +3716,26 @@ window.__ModuleLoader__.load({
   text-overflow: ellipsis;
 }
 .dsh-pl-grid.is-card { display: grid; grid-template-columns: repeat(auto-fill, 168px); justify-content: start; gap: 10px; align-items: stretch; }
+/* 卡片内部三行网格：图标 / 文字 / 底部（状态左、操作右） */
 .dsh-pl-grid.is-card .dsh-pl-item {
   padding: 12px;
-  gap: 6px;
-  /* 竖版卡片：宽高比锁死 3:4，内容再多也不撑高，靠下面几条裁剪规则收住 */
   aspect-ratio: 3 / 4;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'icon icon' 'copy copy' 'badge acts';
+  align-items: start;
+  row-gap: 6px;
+  column-gap: 8px;
   position: relative;
   overflow: hidden;
 }
+.dsh-pl-grid.is-card .dsh-pl-item > img,
+.dsh-pl-grid.is-card .dsh-pl-item > svg.dsh-pl-fallback { grid-area: icon; width: 30px; height: 30px; border-radius: 8px; }
+.dsh-pl-grid.is-card .dsh-pl-acts { grid-area: acts; align-self: end; margin: 0; padding: 0; background: transparent; opacity: 1; pointer-events: auto; }
 .dsh-pl-acts { display: flex; gap: 6px; align-items: center; margin-left: auto; flex: none; }
 .dsh-pl-item { position: relative; }
-.dsh-pl-grid.is-card .dsh-pl-acts { position: static; margin: 2px 0 0; padding: 0; background: transparent; opacity: 1; pointer-events: auto; align-self: stretch; }
-.dsh-pl-grid.is-card .dsh-pl-item > img,
-.dsh-pl-grid.is-card .dsh-pl-item > svg { width: 30px; height: 30px; flex: none; border-radius: 8px; }
-.dsh-pl-grid.is-card .dsh-pl-copy { flex: 1 1 auto; min-height: 0; gap: 4px; width: 100%; }
+.dsh-pl-grid.is-card .dsh-pl-copy { grid-area: copy; min-height: 0; width: 100%; gap: 4px; overflow: hidden; }
 .dsh-pl-grid.is-card .dsh-pl-copy strong {
   white-space: normal;
   overflow: hidden;
@@ -3753,8 +3754,8 @@ window.__ModuleLoader__.load({
   line-height: 1.5;
 }
 .dsh-pl-grid.is-card .dsh-pl-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.dsh-pl-grid.is-card .dsh-pl-local-tag { flex: none; margin-top: auto; }
-.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-card-btn { width: 100%; padding: 5px 8px; font-size: var(--pl-fs-xs); border: 0; background: var(--dsw-alias-bg-layer-2); justify-content: center; }
+.dsh-pl-grid.is-card .dsh-pl-badges { grid-area: badge; align-self: end; }
+.dsh-pl-grid.is-card .dsh-pl-acts .dsh-pl-card-btn { width: auto; padding: 5px 12px; font-size: var(--pl-fs-xs); border: 0; background: var(--dsw-alias-bg-layer-2); justify-content: center; }
 .dsh-pl-item { display: flex; gap: 10px; align-items: center; width: 100%; min-width: 0; min-height: 64px; padding: 12px; text-align: left; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
 .dsh-pl-card-btn { margin-left: 0; flex: none; position: static; }
 .dsh-pl-health { flex: none; margin-left: 0; padding: 4px 9px; border: 0; border-radius: var(--pl-radius-chip); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; white-space: nowrap; }
@@ -3768,7 +3769,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-toast { display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-size: var(--pl-fs-sm); line-height: 1.5; animation: dsh-pl-toast-in 160ms ease-out; }
 .dsh-pl-toast-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--dsw-alias-state-success-primary); }
 @keyframes dsh-pl-toast-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
-.dsh-pl-item.is-pinned { box-shadow: inset 2px 0 0 var(--dsw-alias-border-l2); }
+.dsh-pl-pin { width: 12px; height: 12px; flex: none; color: var(--dsw-alias-state-business-primary); }
 .dsh-pl-item img, .dsh-pl-fallback { width: 22px; height: 22px; border-radius: var(--pl-radius-pill); object-fit: cover; flex: none; }
 .dsh-pl-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
 .dsh-pl-copy strong { font-size: var(--pl-fs-lg); font-weight: 560; color: var(--dsw-alias-label-primary); white-space: normal; overflow-wrap: anywhere; }
