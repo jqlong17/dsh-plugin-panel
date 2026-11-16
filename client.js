@@ -1527,7 +1527,7 @@ window.__ModuleLoader__.load({
       '| 视图 | 规则 |',
       '| --- | --- |',
       '| 卡片 | `aspect-ratio: 3 / 4`（竖版），`grid-template-columns: repeat(auto-fill, minmax(148px, 1fr))` |',
-      '| 列表 | **固定高度 104px**，一行一个；简介只有一行时也占同样的高度 |',
+      '| 列表 | **固定高度 100px**（标题 20 + 简介 36 + meta 16 + 间距与内边距），一行一个 |',
       '',
       '比例锁死的好处是：内容多寡不影响卡片高度，一屏永远整齐。',
       '',
@@ -1553,6 +1553,7 @@ window.__ModuleLoader__.load({
       '- 不要为某个页面单独写卡片样式（出现 `.某个容器 .dsh-pl-item` 这种选择器就是走偏了）',
       '- 不要在卡片上散放按钮，加一个功能就加一个菜单项',
       '- 卡片显示什么内容只有一个来源：`cardEntry()`。视图里出现 `title:` / `subtitle:` / `meta:` 的拼装就是走偏了',
+      '- 页面外壳也只有一个：`dsh-pl-surface`（12px 内边距 + 统一纵向节奏）。不要再出现 `body` / `market` / `scan` 三种容器',
       '- 不要把状态做成多种说法（「运行中」和「已启用」只能选一个）',
       '',
       '## 十三、自检',
@@ -2946,7 +2947,7 @@ window.__ModuleLoader__.load({
       /** 本地扫描：输入一个目录，列出下面所有插件，标出装没装。 */
       function scanView() {
         const items = Array.isArray(scanItems) ? scanItems : []
-        return h('div', { className: 'dsh-pl-scan' },
+        return h('div', { className: 'dsh-pl-surface' },
           h('div', { className: 'dsh-pl-scan-bar' },
             h('input', {
               type: 'text',
@@ -3261,7 +3262,7 @@ window.__ModuleLoader__.load({
 
       function designView() {
         const section = SPEC_SECTIONS.find((s) => s.id === specTab) || SPEC_SECTIONS[0]
-        return h('div', { className: 'dsh-pl-market' },
+        return h('div', { className: 'dsh-pl-surface' },
           h('section', { className: 'dsh-pl-spec' },
             h('div', { className: 'dsh-pl-spec-head' },
               h('div', { className: 'dsh-pl-spec-tabs', role: 'tablist', 'aria-label': 'spec section' },
@@ -3324,7 +3325,7 @@ window.__ModuleLoader__.load({
       function featuredView() {
         // 用和「已安装插件」一样的外壳：页面本身不加内边距，只由网格和子标签各留 12px，
         // 否则两边合起来变成 24px，卡片会明显往中间缩
-        return h('div', { className: 'dsh-pl-body' },
+        return h('div', { className: 'dsh-pl-surface' },
           h('div', { className: 'dsh-pl-subtabs' },
             h('strong', { className: 'dsh-pl-section-title' }, textOf(t, 'list.featuredTitle')),
             viewToggle()),
@@ -3352,7 +3353,7 @@ window.__ModuleLoader__.load({
           ['list.aboutTabFeatured', 'list.aboutTabFeaturedBody'],
           ['list.aboutTabDesign', 'list.aboutTabDesignBody'],
         ]
-        return h('div', { className: 'dsh-pl-market' },
+        return h('div', { className: 'dsh-pl-surface' },
           h('section', { className: 'dsh-pl-about' },
             h('h3', { className: 'dsh-pl-about-h' }, textOf(t, 'list.aboutWhat')),
             h('p', { className: 'dsh-pl-about-p' }, textOf(t, 'list.aboutWhatBody1')),
@@ -3467,7 +3468,7 @@ window.__ModuleLoader__.load({
                 onClick: () => { const next = searchPage + 1; setSearchPage(next); runMarketSearch(marketQuery, searchSort, marketCategory, next) },
               }, textOf(t, 'list.pageNext')))
             : null
-          return h('div', { className: 'dsh-pl-market' },
+          return h('div', { className: 'dsh-pl-surface' },
             searchBox,
             searchStatus === 'loading'
               ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketSearching'))
@@ -3518,7 +3519,7 @@ window.__ModuleLoader__.load({
                       items.map((row) => marketCard(row)))),
                     pager)
         }
-        return h('div', { className: 'dsh-pl-market' },
+        return h('div', { className: 'dsh-pl-surface' },
           searchBox,
           trendStatus === 'loading'
             ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.marketLoading'))
@@ -3612,7 +3613,7 @@ window.__ModuleLoader__.load({
                 h('button', { type: 'button', onClick: () => { void load() } }, textOf(t, 'list.retry')))
               : selected
                 ? detailAside(selected)
-                : h('div', { className: 'dsh-pl-body' },
+                : h('div', { className: 'dsh-pl-surface' },
                 h('div', { className: 'dsh-pl-subtabs', role: 'tablist', 'aria-label': 'installed scope' },
                   [['installed', textOf(t, 'list.installed')], ['builtin', textOf(t, 'list.builtin')], ['scan', textOf(t, 'list.scanTab')]].map(([id, label]) => {
                     const n = id === 'scan' ? 0 : plugins.filter((item) => originOf(item) === id).length
@@ -3687,22 +3688,35 @@ window.__ModuleLoader__.load({
 .dsh-pl-seg button { border: 0; border-radius: var(--pl-radius-pill); background: transparent; color: var(--dsw-alias-label-secondary); padding: 5px 12px; }
 .dsh-pl-seg button.is-on { background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-weight: 600; box-shadow: none; }
 .dsh-pl-item.is-on { border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-bg-layer-2); box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary); }
-.dsh-pl-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
 .dsh-pl-rows, .dsh-pl-grid { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 8px; }
 .dsh-pl-rows { display: flex; flex-direction: column; gap: 6px; }
 .dsh-pl-grid { display: flex; flex-direction: column; gap: 10px; align-content: start; padding: 12px; }
-/* 列表视图也做同样程度的裁剪，保证各 tab 的行高一致 */
-.dsh-pl-grid:not(.is-card) .dsh-pl-copy strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 列表视图：三行文字各给固定高度，行高才算得准，不会被裁掉
+   20 + 36 + 16 = 72，加两处行间距 4 和上下内边距 24，正好 100 */
+.dsh-pl-grid:not(.is-card) .dsh-pl-item { height: 100px; min-height: 0; align-items: center; }
+.dsh-pl-grid:not(.is-card) .dsh-pl-copy { overflow: hidden; gap: 2px; justify-content: center; }
+.dsh-pl-grid:not(.is-card) .dsh-pl-copy strong {
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dsh-pl-grid:not(.is-card) .dsh-pl-where {
+  height: 36px;
+  line-height: 18px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.dsh-pl-grid:not(.is-card) .dsh-pl-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 列表行固定高度：简介最多两行，只有一行时也占同样的高度，整列才整齐 */
-.dsh-pl-grid:not(.is-card) .dsh-pl-item { height: 104px; min-height: 0; align-items: center; }
-.dsh-pl-grid:not(.is-card) .dsh-pl-copy { overflow: hidden; }
+.dsh-pl-grid:not(.is-card) .dsh-pl-meta {
+  height: 16px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dsh-pl-grid.is-card { display: grid; grid-template-columns: repeat(auto-fill, 168px); justify-content: start; gap: 10px; align-items: stretch; }
 .dsh-pl-grid.is-card .dsh-pl-item {
   padding: 12px;
@@ -3794,9 +3808,11 @@ window.__ModuleLoader__.load({
 .dsh-pl-md th { color: var(--dsw-alias-label-secondary); font-weight: 650; background: var(--dsw-alias-bg-layer-1); white-space: nowrap; }
 .dsh-pl-md td:first-child { white-space: nowrap; }
 .dsh-pl-md tr:last-child td { border-bottom: 0; }
-.dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
 .dsh-pl-featured-foot { margin: 12px 0 0; padding: 0 12px 12px; }
 .dsh-pl-accent { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
+.dsh-pl-surface { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 12px; }
+.dsh-pl-surface .dsh-pl-grid { padding: 0; overflow: visible; flex: none; }
+.dsh-pl-surface .dsh-pl-subtabs { padding: 0; }
 .dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
@@ -3831,9 +3847,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dsh-pl-block-head > .dsh-pl-view { flex: none; margin-left: 4px; }
 .dsh-pl-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
-.dsh-pl-scan { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
-.dsh-pl-scan > .dsh-pl-grid { padding: 0 0 12px; overflow: visible; }
-.dsh-pl-scan-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dsh-pl-scan-bar { display: flex; align-items: center; gap: 8px; }
 .dsh-pl-scan-bar .dsh-pl-search { flex: 1 1 auto; margin: 0; }
 .dsh-pl-section-title { font-size: var(--pl-fs-md); font-weight: 600; color: var(--dsw-alias-label-primary); margin-right: auto; }
 .dsh-pl-menu-layer { position: fixed; inset: 0; z-index: 40; }
@@ -3847,12 +3861,11 @@ window.__ModuleLoader__.load({
 .dsh-pl-local-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-local-tag.is-off { color: var(--dsw-alias-state-warn-label); }
 .dsh-pl-local-tag.is-failed { color: var(--dsw-alias-state-error-primary); }
-.dsh-pl-market .dsh-pl-grid { padding-left: 0; padding-right: 0; }
 .dsh-pl-head-right > .dsh-pl-view { margin-left: 0; }
 .dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
 .dsh-pl-block-head span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-block { margin-bottom: 22px; }
-.dsh-pl-market .dsh-pl-note { margin: 10px 2px 0; }
+.dsh-pl-surface .dsh-pl-note { margin: 0; }
 .dsh-pl-hot { margin-top: 4px; }
 .dsh-pl-search-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .dsh-pl-subtabs { display: flex; flex: none; align-items: center; gap: 6px; padding: 10px 12px 0; }
@@ -3861,7 +3874,6 @@ window.__ModuleLoader__.load({
 .dsh-pl-subtab:hover { border-color: var(--dsw-alias-border-l2); color: var(--dsw-alias-label-primary); }
 .dsh-pl-subtab.is-on { border-color: transparent; background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-on-color); }
 .dsh-pl-subtab-n { font-variant-numeric: tabular-nums; opacity: 0.75; }
-.dsh-pl-body > .dsh-pl-grid { flex: 1 1 auto; min-height: 0; padding-top: 8px; }
 .dsh-pl-pager { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 0 4px; }
 .dsh-pl-pager-btn { flex: none; padding: 6px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-chip); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-family: inherit; font-size: var(--pl-fs-sm); cursor: pointer; }
 .dsh-pl-pager-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2); }
