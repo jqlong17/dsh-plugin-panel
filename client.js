@@ -172,6 +172,9 @@ window.__ModuleLoader__.load({
         'list.installLink': '本地开发（软链）',
         'list.installFile': '本地文件',
         'list.localTag': '本地',
+        'list.tagEnabled': '已启用',
+        'list.tagDisabled': '已停用',
+        'list.tagFailed': '启动失败',
         'list.scanTab': '本地扫描',
         'list.scanButton': '扫描',
         'list.scanning': '扫描中…',
@@ -371,6 +374,9 @@ window.__ModuleLoader__.load({
         'list.installLink': 'Local dev (link)',
         'list.installFile': 'Local file',
         'list.localTag': 'Local',
+        'list.tagEnabled': 'Enabled',
+        'list.tagDisabled': 'Disabled',
+        'list.tagFailed': 'Failed',
         'list.scanTab': 'Scan',
         'list.scanButton': 'Scan',
         'list.scanning': 'Scanning…',
@@ -529,6 +535,14 @@ window.__ModuleLoader__.load({
       if (tail.startsWith('link:')) return { kind: 'link', path: tail.slice(5) }
       if (tail.startsWith('file:')) return { kind: 'file', path: tail.slice(5) }
       return { kind: 'npm', path: '' }
+    }
+
+    /** 一个已装插件的运行状态：启用 / 停用 / 启动失败。 */
+    function pluginStateOf(plugin) {
+      if (!plugin) return 'missing'
+      if (plugin.fiberPhase === 'failed') return 'failed'
+      if (plugin.enabled === false) return 'disabled'
+      return 'active'
     }
 
     /** 安装方式的一行说明：npm 显示来源，本地显示路径。 */
@@ -3347,13 +3361,17 @@ window.__ModuleLoader__.load({
                       ].filter(Boolean).join(' ')
                       const bundle = matchBundle(plugin, bundles)
                       const localInstall = bundle && installSourceOf(bundle).kind !== 'npm'
+                      const state = pluginStateOf(plugin)
                       return h(PluginCard, {
                         key: plugin.entryId,
                         icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
                         title,
                         subtitle: places,
                         className: classes,
-                        badge: localInstall ? h('span', { className: 'dsh-pl-local-tag' }, textOf(t, 'list.localTag')) : null,
+                        badge: h('span', { className: 'dsh-pl-badges' },
+                          h('span', { className: `dsh-pl-local-tag${state === 'failed' ? ' is-failed' : state === 'disabled' ? ' is-off' : ''}` },
+                            textOf(t, state === 'failed' ? 'list.tagFailed' : state === 'disabled' ? 'list.tagDisabled' : 'list.tagEnabled')),
+                          localInstall ? h('span', { className: 'dsh-pl-local-tag' }, textOf(t, 'list.localTag')) : null),
                         onClick: () => setSelectedId(plugin.entryId),
                         actions: [
                           healthChip(title, diagnoses[plugin.entryId], copiedKey === plugin.entryId, () => {
@@ -3558,6 +3576,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-scan-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dsh-pl-scan-bar .dsh-pl-search { flex: 1 1 auto; margin: 0; }
 .dsh-pl-section-title { font-size: var(--pl-fs-md); font-weight: 600; color: var(--dsw-alias-label-primary); margin-right: auto; }
+.dsh-pl-badges { display: inline-flex; align-items: center; gap: 4px; }
 .dsh-pl-local-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
 .dsh-pl-local-tag.is-off { color: var(--dsw-alias-state-warn-label); }
 .dsh-pl-local-tag.is-failed { color: var(--dsw-alias-state-error-primary); }
