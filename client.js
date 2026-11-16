@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const PANEL_ID = 'dsh-plugin-panel'
     const TAB_KIND = 'plugin-canvas'
     const NS = 'dsh-plugin-panel'
-    const VERSION = 'v0.1.15'
+    const VERSION = 'v0.1.16'
     const PREF_KEY = 'dsh.plugin-list.pref.v2'
 
     const COPY = {
