@@ -111,7 +111,6 @@ window.__ModuleLoader__.load({
         'list.pageInfo': '第 {page} / {pages} 页',
         'list.hotSearch': '搜索插件名、说明或分类…',
         'list.hotNoMatch': '没有匹配的插件',
-        'list.featuredTag': '精选',
         'list.featuredFoot': '如需推荐插件，或希望自己的插件被收录，欢迎微信联系：ruskacoffee',
         'list.featuredContact': '如需推荐插件，或希望自己的插件被收录，欢迎微信联系：ruskacoffee',
         'list.hotTitle': '最近 7 天增长最快的插件',
@@ -200,6 +199,7 @@ window.__ModuleLoader__.load({
         'list.refresh': 'Refresh',
         'list.market': 'Plugin market',
         'list.featured': 'Featured',
+        'list.featuredFoot': 'To suggest a plugin or have yours listed, contact us on WeChat: ruskacoffee',
         'list.design': 'Design spec',
         'list.about': 'About',
         'list.aboutWhat': 'What this plugin does',
@@ -1319,13 +1319,40 @@ window.__ModuleLoader__.load({
       '',
       '`fill="none"`、`stroke="currentColor"`、圆角线帽、只画 2–4 条线。小尺寸必须同步减细描边，否则比 24px 版本更粗。',
       '',
-      '## 七、间距：水平统一 12px',
+      '## 七、间距：水平方向永远只有一个 12px',
       '',
-      '| 区域 | 规则 |',
-      '| --- | --- |',
-      '| 工具栏 | `padding: 12px 12px 10px` |',
-      '| 列表容器 | `padding: 12px` |',
-      '| 列表项 | `padding: 10px 12px` |',
+      '**这一节最容易做错**：容器有内边距，里面的列表容器又写了一遍内边距，两层一叠就是 24px，',
+      '卡片会明显往中间缩。所以先把「每一层的数值」定死。',
+      '',
+      '### 两种页面外壳，二选一',
+      '',
+      '| 外壳 | 用途 | 自身内边距 | 内部网格的左右内边距 |',
+      '| --- | --- | --- | --- |',
+      '| `.dsh-pl-body` | 有子标签/视图切换的列表页（已安装、精选） | **0** | 12px（网格自己给） |',
+      '| `.dsh-pl-market` | 带搜索框、说明文字的页（市场、关于、设计规范） | **12px** | **0**（交给外壳） |',
+      '',
+      '**不要混用**：`body` 里套 `market`，或者 `market` 里的网格还留 12px，都会变成 24px。',
+      '',
+      '### 各层具体数值',
+      '',
+      '| 位置 | 上 | 右 | 下 | 左 |',
+      '| --- | --- | --- | --- | --- |',
+      '| 工具栏 `.dsh-pl-bar` | 12 | 12 | 10 | 12 |',
+      '| 子标签行 `.dsh-pl-subtabs` | 10 | 12 | 0 | 12 |',
+      '| 列表网格 `.dsh-pl-grid`（`body` 内） | 8 | 12 | 12 | 12 |',
+      '| 页面外壳 `.dsh-pl-market` | 12 | 12 | 12 | 12 |',
+      '| 卡片 `.dsh-pl-item` | 12 | 12 | 12 | 12 |',
+      '| 卡片之间 `gap` | — | — | 10 | — |',
+      '| 底部说明行 | 12 | 12 | 12 | 12 |',
+      '',
+      '### 判断方法',
+      '',
+      '量两点就够了：',
+      '',
+      '1. **卡片左边缘到面板窗口左边缘 = 12px**（换哪个页签都一样）',
+      '2. **卡片右边缘到面板窗口右边缘 = 12px**',
+      '',
+      '如果量出来是 24px，说明容器和网格各给了一次，删掉里面那层的左右内边距。',
       '',
       '## 八、提示：三类，生命周期不同',
       '',
@@ -1377,6 +1404,7 @@ window.__ModuleLoader__.load({
       '- [ ] 可聚焦元素都有 `:focus-visible` outline',
       '- [ ] 卡片边框是 `l2` 且未淡化',
       '- [ ] 一屏最多三个字号、三个圆角档',
+      '- [ ] 卡片左右边缘到面板边缘各 12px，没有叠加成 24px',
       '- [ ] 近黑实心块 ≤ 1、高饱和彩色块 ≤ 2',
       '- [ ] 图标 24px 用 1.8，16px 内联用 1.2',
       '- [ ] 图表未选中数据是浅色，不是 `fill-l2`',
@@ -2491,9 +2519,11 @@ window.__ModuleLoader__.load({
         return h('section', { className: 'dsh-pl-hot' },
           h('div', { className: 'dsh-pl-block-head' },
             h('strong', null, textOf(t, 'list.hotTitle')),
-            hot && hot.fromDay
-              ? h('span', null, rows.length === shown.length ? `${hot.fromDay} → ${hot.toDay}` : `${shown.length} / ${rows.length}`)
-              : null),
+            h('div', { className: 'dsh-pl-head-right' },
+              hot && hot.fromDay
+                ? h('span', null, rows.length === shown.length ? `${hot.fromDay} → ${hot.toDay}` : `${shown.length} / ${rows.length}`)
+                : null,
+              viewToggle())),
           h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.hotHint')),
           hotStatus === 'loading'
             ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.hotLoading'))
@@ -2504,16 +2534,7 @@ window.__ModuleLoader__.load({
                 : shown.length === 0
                 ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.hotNoMatch'))
                 : h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
-                  shown.map((row, index) => h(PluginCard, {
-                    key: row.repo || row.name || index,
-                    icon: row.icon ? h('img', { src: row.icon, alt: '', draggable: false }) : null,
-                    title: row.name,
-                    subtitle: row.summary || row.categoryZh || row.category || '',
-                    className: 'is-market',
-                    badge: h('span', { className: 'dsh-pl-delta' }, `+${row.delta.toLocaleString()}`),
-                    onClick: () => setSelectedMarket(row),
-                    actions: [hotAction(row)],
-                  }))))
+                  shown.map((row) => marketCard(row, h('span', { className: 'dsh-pl-delta' }, `+${row.delta.toLocaleString()}`)))))
       }
 
       const searchTimer = React.useRef(null)
@@ -2720,33 +2741,93 @@ window.__ModuleLoader__.load({
         }
       }
 
+      /**
+       * 精选推荐：和「已安装插件」共用一套卡片、视图切换和详情。
+       *
+       * 不加任何「精选专用」样式——卡片就是普通插件卡；
+       * 点卡片时，装了的进已安装那套详情，没装的进市场那套详情。
+       * 推荐理由只在详情里出现，不塞进卡片副标题（否则卡片排版和已安装的不一致）。
+       */
+      /**
+       * 市场 / 榜单里的一张卡。
+       *
+       * 规则和「已安装插件」一致：装了的显示中文名、图标、入口位置，点开进已安装详情；
+       * 没装的显示包名和简介，点开进市场详情。这样四个地方（已安装、精选、榜单、搜索）
+       * 的卡片长得一样、点起来也一样。
+       */
+      function marketCard(row, badge) {
+        const plugin = plugins.find((p) => p.moduleName === row.name || p.patchId === row.name)
+        const installed = Boolean(plugin)
+        const iconUrl = installed
+          ? safeIcon(plugin.meta && plugin.meta.icon)
+          : safeIcon(row.icon)
+        const places = installed
+          ? placesFor(plugin, guide, seats, localeId)
+            .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
+            .join(' · ') || textOf(t, 'list.placeNone')
+          : ''
+        const classes = [
+          installed && selectedId === plugin.entryId ? 'is-on' : '',
+          installed && pins.includes(plugin.entryId) ? 'is-pinned' : '',
+          installed ? '' : 'is-market',
+        ].filter(Boolean).join(' ')
+        return h(PluginCard, {
+          key: row.repo || row.name,
+          icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
+          title: installed ? pluginTitle(plugin, localeId) : row.name,
+          subtitle: installed ? places : (row.summary || row.categoryZh || row.category || ''),
+          className: classes,
+          badge: badge || null,
+          onClick: () => {
+            if (installed) setSelectedId(plugin.entryId)
+            else setSelectedMarket(row)
+          },
+          actions: [hotAction(row)],
+        })
+      }
+
       function featuredView() {
-        return h('div', { className: 'dsh-pl-market' },
-          h('div', { className: 'dsh-pl-curated-list' }, CURATED.map((item) => {
-            const installed = isInstalled(item.name)
-            const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
-            const icon = safeIcon(plugin && plugin.meta && plugin.meta.icon)
-            return h(PluginCard, {
-              key: item.name,
-              icon: icon ? h('img', { src: icon, alt: '', draggable: false }) : h(DefaultPluginIcon),
-              title: item.title,
-              subtitle: item.reason,
-              className: 'is-market is-curated',
-              badge: h('span', { className: 'dsh-pl-curated-tag' }, textOf(t, 'list.featuredTag')),
-              actions: [
-                h('button', {
-                  key: 'act',
-                  type: 'button',
-                  className: 'dsh-pl-card-btn',
-                  onClick: (event) => {
-                    event.stopPropagation()
-                    if (installed) return
-                    void installFromMarket(item.name)
-                  },
-                }, installed ? textOf(t, 'list.installedState') : textOf(t, 'list.install')),
-              ],
-            })
-          })),
+        // 用和「已安装插件」一样的外壳：页面本身不加内边距，只由网格和子标签各留 12px，
+        // 否则两边合起来变成 24px，卡片会明显往中间缩
+        return h('div', { className: 'dsh-pl-body' },
+          h('div', { className: 'dsh-pl-subtabs' }, viewToggle()),
+          h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
+            CURATED.map((item) => {
+              const plugin = plugins.find((p) => p.moduleName === item.name || p.patchId === item.name)
+              const installed = Boolean(plugin)
+              const iconUrl = plugin ? safeIcon(plugin.meta && plugin.meta.icon) : ''
+              const places = plugin
+                ? placesFor(plugin, guide, seats, localeId)
+                  .map((place) => textOf(t, place === 'right' ? 'list.placeRight' : place === 'settings' ? 'list.placeSettings' : 'list.placeLeft'))
+                  .join(' · ') || textOf(t, 'list.placeNone')
+                : textOf(t, 'list.notInstalled')
+              return h(PluginCard, {
+                key: item.name,
+                icon: iconUrl ? h('img', { src: iconUrl, alt: '', draggable: false }) : null,
+                title: plugin ? pluginTitle(plugin, localeId) : item.title,
+                subtitle: places,
+                className: [
+                  plugin && selectedId === plugin.entryId ? 'is-on' : '',
+                  plugin && pins.includes(plugin.entryId) ? 'is-pinned' : '',
+                ].filter(Boolean).join(' '),
+                onClick: () => {
+                  if (plugin) setSelectedId(plugin.entryId)
+                  else setSelectedMarket({ name: item.name, title: item.title, summary: item.reason, remote: true })
+                },
+                actions: [
+                  h('button', {
+                    key: 'act',
+                    type: 'button',
+                    className: 'dsh-pl-card-btn',
+                    onClick: (event) => {
+                      event.stopPropagation()
+                      if (installed) return
+                      void installFromMarket(item.name)
+                    },
+                  }, installed ? textOf(t, 'list.installedState') : textOf(t, 'list.install')),
+                ],
+              })
+            })),
           h('p', { className: 'dsh-pl-note dsh-pl-featured-foot' }, textOf(t, 'list.featuredContact')))
       }
 
@@ -2903,24 +2984,21 @@ window.__ModuleLoader__.load({
                               ? h('p', { className: 'dsh-pl-note' }, textOf(t, 'list.remoteSaved').replace('{n}', String(remoteAdded)))
                               : null,
                             h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
-                              remoteResult.map((row, index) => h(PluginCard, {
-                                key: row.name || index,
-                                icon: null,
-                                title: row.name,
-                                subtitle: row.summary || '',
-                                className: 'is-market',
-                                badge: row.version ? h('span', { className: 'dsh-pl-metric' }, `v${row.version}`) : null,
-                                onClick: () => {
-                                  setSelectedMarket(row)
+                              remoteResult.map((row) => {
+                                const card = marketCard(row, row.version ? h('span', { className: 'dsh-pl-metric' }, `v${row.version}`) : null)
+                                // 远程结果点开时顺带补全元信息（体积、许可、仓库）
+                                const original = card.p.onClick
+                                card.p.onClick = () => {
+                                  original()
                                   if (typeof props.remoteDetail !== 'function') return
                                   Promise.resolve(props.remoteDetail({ name: row.name })).then((result) => {
                                     const value = result && result.ok === true ? result.value : result
                                     if (!value || !value.name) return
                                     setSelectedMarket((prev) => (prev && prev.name === value.name ? { ...prev, ...value } : prev))
                                   }).catch(() => {})
-                                },
-                                actions: [hotAction(row)],
-                              }))))
+                                }
+                                return card
+                              })))
                           : remoteStatus === 'ready'
                             ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.remoteEmpty'))
                             : null)
@@ -2932,19 +3010,10 @@ window.__ModuleLoader__.load({
                         chip('new', textOf(t, 'list.sortNew'), searchSort, (id) => { setSearchSort(id); setSearchPage(0); runMarketSearch(marketQuery, id, marketCategory, 0) })),
                       viewToggle()),
                     h('div', { className: `dsh-pl-grid${view === 'card' ? ' is-card' : ''}` },
-                      items.map((row, index) => h(PluginCard, {
-                        key: row.name || index,
-                        icon: null,
-                        title: row.name,
-                        subtitle: row.summary || row.categoryZh || row.category || '',
-                        className: 'is-market',
-                        badge: (() => {
-                          const metric = marketMetric(row)
-                          return metric ? h('span', { className: 'dsh-pl-metric', title: metric.title }, metric.text) : null
-                        })(),
-                        onClick: () => setSelectedMarket(row),
-                        actions: [hotAction(row)],
-                      })))),
+                      items.map((row) => {
+                        const metric = marketMetric(row)
+                        return marketCard(row, metric ? h('span', { className: 'dsh-pl-metric', title: metric.title }, metric.text) : null)
+                      }))),
                     pager)
         }
         return h('div', { className: 'dsh-pl-market' },
@@ -2987,11 +3056,11 @@ window.__ModuleLoader__.load({
         h('header', { className: 'dsh-pl-bar' },
           h('div', { className: 'dsh-pl-tools' },
             h('div', { className: 'dsh-pl-seg', role: 'group', 'aria-label': 'filter' },
-              chip('plugins', textOf(t, 'list.installedAll'), surface === 'plugins' ? 'plugins' : '', () => setSurface('plugins')),
-              chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => setSurface('market')),
-              chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => setSurface('featured')),
-              chip('design', textOf(t, 'list.design'), surface === 'design' ? 'design' : '', () => setSurface('design')),
-              chip('about', textOf(t, 'list.about'), surface === 'about' ? 'about' : '', () => setSurface('about'))),
+              chip('plugins', textOf(t, 'list.installedAll'), surface === 'plugins' ? 'plugins' : '', () => { setSurface('plugins'); setSelectedId(''); setSelectedMarket(null) }),
+              chip('market', textOf(t, 'list.market'), surface === 'market' ? 'market' : '', () => { setSurface('market'); setSelectedId(''); setSelectedMarket(null) }),
+              chip('featured', textOf(t, 'list.featured'), surface === 'featured' ? 'featured' : '', () => { setSurface('featured'); setSelectedId(''); setSelectedMarket(null) }),
+              chip('design', textOf(t, 'list.design'), surface === 'design' ? 'design' : '', () => { setSurface('design'); setSelectedId(''); setSelectedMarket(null) }),
+              chip('about', textOf(t, 'list.about'), surface === 'about' ? 'about' : '', () => { setSurface('about'); setSelectedId(''); setSelectedMarket(null) })),
             h('button', {
               type: 'button',
               className: 'dsh-pl-refresh',
@@ -3015,9 +3084,9 @@ window.__ModuleLoader__.load({
           : surface === 'design'
           ? designView()
           : surface === 'featured'
-          ? featuredView()
+          ? selected ? detailAside(selected) : selectedMarket ? marketDetail(selectedMarket) : featuredView()
           : surface === 'market'
-          ? selectedMarket ? marketDetail(selectedMarket) : marketView()
+          ? selected ? detailAside(selected) : selectedMarket ? marketDetail(selectedMarket) : marketView()
           : status === 'loading' && plugins.length === 0
           ? h('p', { className: 'dsh-pl-state' }, textOf(t, 'list.loading'))
           : status === 'unavailable'
@@ -3227,13 +3296,7 @@ window.__ModuleLoader__.load({
 .dsh-pl-md td:first-child { white-space: nowrap; }
 .dsh-pl-md tr:last-child td { border-bottom: 0; }
 .dsh-pl-market { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px; }
-.dsh-pl-curated-tag { flex: none; padding: 2px 8px; border-radius: var(--pl-radius-pill); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: var(--pl-fs-xs); }
-.dsh-pl-item.is-curated { min-height: 78px; align-items: flex-start; }
-.dsh-pl-item.is-curated .dsh-pl-copy strong { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.4; }
-.dsh-pl-item.is-curated .dsh-pl-where { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.6; }
-.dsh-pl-curated-list { display: flex; flex-direction: column; gap: 10px; }
-.dsh-pl-featured-foot { margin: 14px 0 0; }
-.dsh-pl-market > .dsh-pl-item.is-curated:first-child { margin-top: 2px; }
+.dsh-pl-featured-foot { margin: 12px 0 0; padding: 0 12px 12px; }
 .dsh-pl-accent { color: var(--dsw-alias-state-business-primary); font-weight: 600; }
 .dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
@@ -3268,6 +3331,9 @@ window.__ModuleLoader__.load({
 .dsh-pl-copy-spec:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
 .dsh-pl-block-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dsh-pl-block-head > .dsh-pl-view { flex: none; margin-left: 4px; }
+.dsh-pl-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.dsh-pl-market .dsh-pl-grid { padding-left: 0; padding-right: 0; }
+.dsh-pl-head-right > .dsh-pl-view { margin-left: 0; }
 .dsh-pl-block-head strong { font-size: var(--pl-fs-lg); }
 .dsh-pl-block-head span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-block { margin-bottom: 22px; }
