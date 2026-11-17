@@ -50,6 +50,9 @@ window.__ModuleLoader__.load({
         'list.designTitle': '插件设计规范',
         'list.designHint': '按场景选一段复制，粘给任意 AI 即可。所有 token 名都对照 DSH 实际样式表核对过。',
         'list.designCopy': '复制规范',
+        'list.designCopyAll': '复制全部',
+        'list.designCopyAllHint': '把三个场景拼成一份 Markdown，直接粘贴给 AI',
+        'list.designCopiedAll': '已复制全部设计规范（三段合并）',
         'list.designCopied': '{name}规范已复制，粘给任意 AI 智能体即可让它照做',
         'list.back': '返回',
         'list.marketTitle': '插件市场趋势',
@@ -266,6 +269,9 @@ window.__ModuleLoader__.load({
         'list.designTitle': 'Plugin design spec',
         'list.designHint': 'Copy the section that matches your situation and hand it to any AI. Token names are verified against the real DSH stylesheet.',
         'list.designCopy': 'Copy spec',
+        'list.designCopyAll': 'Copy all',
+        'list.designCopyAllHint': 'Join the three scenarios into one Markdown document for an AI',
+        'list.designCopiedAll': 'Full spec copied (three sections merged)',
         'list.designCopied': '{name} spec copied — paste it into any agent',
         'list.back': 'Back',
         'list.marketTitle': 'Plugin market trend',
@@ -3296,31 +3302,63 @@ window.__ModuleLoader__.load({
                   'aria-selected': item.id === specTab,
                   onClick: () => setSpecTab(item.id),
                 }, item.title))),
-              h('button', {
-                type: 'button',
-                className: 'dsh-pl-copy-spec',
-                onClick: () => { void copySpec(section) },
-              }, copiedKey === `spec-${section.id}` ? textOf(t, 'list.copied') : textOf(t, 'list.designCopy'))),
+              h('div', { className: 'dsh-pl-spec-tools' },
+                h('button', {
+                  type: 'button',
+                  className: 'dsh-pl-copy-spec',
+                  onClick: () => { void copySpec(section) },
+                }, copiedKey === `spec-${section.id}` ? textOf(t, 'list.copied') : textOf(t, 'list.designCopy')),
+                h('button', {
+                  type: 'button',
+                  className: 'dsh-pl-copy-spec is-primary',
+                  title: textOf(t, 'list.designCopyAllHint'),
+                  onClick: () => { void copyAllSpec() },
+                }, copiedKey === 'spec-all' ? textOf(t, 'list.copied') : textOf(t, 'list.designCopyAll')))),
             h('p', { className: 'dsh-pl-spec-hint' }, section.hint),
             h('div', { className: 'dsh-pl-spec-body' }, markdownView(section.text))))
       }
 
+      /** 写剪贴板：优先异步 API，老 WebView 退回 textarea。 */
+      async function writeClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text)
+          return
+        }
+        const area = document.createElement('textarea')
+        area.value = text
+        area.style.position = 'fixed'
+        area.style.opacity = '0'
+        document.body.appendChild(area)
+        area.select()
+        document.execCommand('copy')
+        document.body.removeChild(area)
+      }
+
       async function copySpec(section) {
         try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(section.text)
-          } else {
-            const area = document.createElement('textarea')
-            area.value = section.text
-            area.style.position = 'fixed'
-            area.style.opacity = '0'
-            document.body.appendChild(area)
-            area.select()
-            document.execCommand('copy')
-            document.body.removeChild(area)
-          }
+          await writeClipboard(section.text)
           setCopiedKey(`spec-${section.id}`)
           showToast(textOf(t, 'list.designCopied').replace('{name}', section.title))
+          setTimeout(() => setCopiedKey(''), 2200)
+        } catch (failure) {
+          setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
+        }
+      }
+
+      /** 复制整份设计规范：三部分拼成一份 Markdown，直接粘给 AI。 */
+      async function copyAllSpec() {
+        try {
+          const text = [
+            '# DSH 插件设计规范',
+            '',
+            '> 三个场景：骨架与元信息、视觉设计、移动端接入。按需取用，不用全读。',
+            '',
+            DESIGN_SPEC,
+            '',
+          ].join('\n')
+          await writeClipboard(text)
+          setCopiedKey('spec-all')
+          showToast(textOf(t, 'list.designCopiedAll'))
           setTimeout(() => setCopiedKey(''), 2200)
         } catch (failure) {
           setListNote(`${textOf(t, 'list.copyFailed')}：${failure instanceof Error ? failure.message : 'unknown'}`)
@@ -3816,6 +3854,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-about-copy { margin-left: auto; display: block; padding: 5px 12px; border: 0; border-radius: var(--pl-radius-chip); background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-on-color); font-family: inherit; font-size: var(--pl-fs-xs); cursor: pointer; }
 .dsh-pl-about-copy:hover { opacity: 0.9; }
 .dsh-pl-spec { border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); overflow: hidden; }
+.dsh-pl-spec-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+.dsh-pl-copy-spec.is-primary { border-color: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-state-business-primary); }
 .dsh-pl-spec-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2); }
 .dsh-pl-spec-tabs { display: flex; gap: 2px; min-width: 0; overflow: hidden; }
 .dsh-pl-spec-tab { flex: none; padding: 5px 10px; border: 0; border-radius: var(--pl-radius-chip); background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: var(--pl-fs-sm); cursor: pointer; white-space: nowrap; }
