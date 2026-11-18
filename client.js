@@ -196,6 +196,7 @@ window.__ModuleLoader__.load({
         'list.scanInstalled': '{name} 已安装，重启 DSH 后生效',
         'list.toggleUnavailable': '这个条目不能从这里启停，请用 dsh plugin 命令',
         'list.actions': '操作',
+        'list.viewDetail': '查看详情',
         'list.healthCopy': '复制报告',
         'list.installFromLocal': '安装（本地路径）',
         'list.toggleFailed': '启停失败',
@@ -414,6 +415,7 @@ window.__ModuleLoader__.load({
         'list.scanInstalled': '{name} installed — restart DSH to apply',
         'list.toggleUnavailable': 'This entry cannot be toggled from here; use the dsh plugin command',
         'list.actions': 'Actions',
+        'list.viewDetail': 'View details',
         'list.healthCopy': 'copy report',
         'list.installFromLocal': 'Install (local path)',
         'list.toggleFailed': 'Toggle failed',
@@ -3038,6 +3040,29 @@ window.__ModuleLoader__.load({
         const items = []
         const { plugin, bundle, scan, name, installed, state } = entry
 
+        // 卡片封面点一下是「打开插件」，所以详情入口放在菜单里
+        if (plugin) {
+          items.push({
+            key: 'detail',
+            label: textOf(t, 'list.viewDetail'),
+            onClick: () => {
+              setSelectedMarket(null)
+              setSelectedScan(null)
+              setSelectedId(plugin.entryId)
+            },
+          })
+        } else if (scan) {
+          items.push({
+            key: 'detail',
+            label: textOf(t, 'list.viewDetail'),
+            onClick: () => {
+              setSelectedId('')
+              setSelectedMarket(null)
+              setSelectedScan(scan)
+            },
+          })
+        }
+
         if (!installed) {
           items.push({
             key: 'install',
@@ -3201,7 +3226,13 @@ window.__ModuleLoader__.load({
         const tagClass = state === 'failed' ? 'is-failed' : state === 'disabled' ? 'is-off' : ''
 
         let onClick
-        if (installed) onClick = () => setSelectedId(plugin.entryId)
+        if (installed) {
+          onClick = () => {
+            const kind = tabKindFor(plugin, guide, localeId)
+            if (kind && typeof openPanel === 'function') openPanel(kind)
+            else setSelectedId(plugin.entryId)
+          }
+        }
         else if (curated) onClick = () => setSelectedMarket({ name: curated.name, title: curated.title, summary: curated.reason, remote: true })
         else if (row) onClick = () => setSelectedMarket(row)
         else if (scan) onClick = () => setSelectedScan(scan)
