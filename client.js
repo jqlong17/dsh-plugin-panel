@@ -61,6 +61,7 @@ window.__ModuleLoader__.load({
         'list.marketError': '取不到目录数据。如果刚更新过插件，重启一次 DeepSeek Harness 再试。',
         'list.countNow': '当前收录',
         'list.countFiltered': '已过滤',
+        'list.countFilteredHint': '目录自动抓到的候选里没通过筛查的数量：不是插件包、已废弃、缺入口、版本不兼容等 17 类原因。它统计的是扫描范围，不是收录数量，也不是 npm 全站统计。',
         'list.perDay': '日均新增',
         'list.spanDays': '覆盖天数',
         'list.marketFirstNote': '首日已含此前录入的存量，不是从 0 开始',
@@ -281,6 +282,7 @@ window.__ModuleLoader__.load({
         'list.marketError': 'Could not read the catalog. Restart DeepSeek Harness once if you just updated.',
         'list.countNow': 'Listed',
         'list.countFiltered': 'Filtered',
+        'list.countFilteredHint': 'Candidates the catalog scanned but rejected: not a plugin package, deprecated, missing entry, incompatible version, one of 17 reasons. It counts the scan, not the catalog, and is not npm-wide.',
         'list.perDay': 'Per day',
         'list.spanDays': 'Days',
         'list.marketFirstNote': 'First point already includes earlier stock; not growth from zero',
@@ -3592,7 +3594,7 @@ window.__ModuleLoader__.load({
                         chip('daily', textOf(t, 'list.chartDaily'), chartMode, setChartMode))),
                     h('div', { className: 'dsh-pl-market-stats' },
                       stat(textOf(t, 'list.countNow'), last.count.toLocaleString()),
-                      stat(textOf(t, 'list.countFiltered'), (last.rejected || 0).toLocaleString()),
+                      stat(textOf(t, 'list.countFiltered'), (last.rejected || 0).toLocaleString(), textOf(t, 'list.countFilteredHint')),
                       stat(textOf(t, 'list.perDay'), `+${perDay.toLocaleString()}`),
                       stat(textOf(t, 'list.spanDays'), String(days.length))),
                     h('div', { className: 'dsh-pl-chart-wrap' },
@@ -3605,9 +3607,9 @@ window.__ModuleLoader__.load({
                 : null)
       }
 
-      function stat(label, value) {
-        return h('div', { className: 'dsh-pl-stat' },
-          h('span', null, label),
+      function stat(label, value, hint) {
+        return h('div', { className: 'dsh-pl-stat', title: hint || undefined },
+          h('span', null, label, hint ? h('span', { className: 'dsh-pl-stat-hint' }, 'ⓘ') : null),
           h('strong', null, value))
       }
 
@@ -3857,8 +3859,10 @@ window.__ModuleLoader__.load({
 .dsh-pl-surface .dsh-pl-grid { padding: 0; overflow: visible; flex: none; }
 .dsh-pl-surface .dsh-pl-subtabs { padding: 0; }
 .dsh-pl-market-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.dsh-pl-stat > span { display: inline-flex; align-items: center; }
 .dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-stat-hint { margin-left: 4px; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); opacity: 0.8; cursor: help; }
 .dsh-pl-stat strong { font-size: var(--pl-fs-num); font-weight: 600; line-height: 1.2; }
 .dsh-pl-chart-wrap { padding: 10px 14px 6px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 /* 图表：图本身用百分比坐标铺满绘图区，文字是 HTML，字号不随面板宽度变 */
