@@ -3868,7 +3868,8 @@ window.__ModuleLoader__.load({
 .dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-stat strong { font-size: var(--pl-fs-num); font-weight: 600; line-height: 1.2; }
 .dsh-pl-chart-wrap { padding: 10px 12px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
-.dsh-pl-chart { display: block; width: 100%; height: auto; }
+/* 图表按宽度缩放，但高度封顶：面板很宽时不会变成一张巨图 */
+.dsh-pl-chart { display: block; width: 100%; height: auto; max-height: 260px; }
 .dsh-pl-about { padding: 16px 18px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-about-h { margin: 0 0 10px; font-size: var(--pl-fs-lg); font-weight: 600; color: var(--dsw-alias-label-primary); }
 .dsh-pl-about-p { margin: 0 0 8px; font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
