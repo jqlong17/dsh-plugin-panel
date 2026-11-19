@@ -609,11 +609,11 @@ window.__ModuleLoader__.load({
     /** 图的公共外壳：左边的刻度、底部的日期、图本身用百分比坐标，文字走 HTML。 */
     function chartFrame({ ticks, tickLabel, xLabels, lastLabel, plot, overlay, tip }) {
       return h('div', { className: 'dsh-pl-chartbox' },
-        h('div', { className: 'dsh-pl-chart-y' }, ticks.map((tick, index) => h('span', { key: index }, tickLabel(tick)))),
-        plot,
-        overlay,
+        // 纵轴从大到小：最大值在上，0 在下
+        h('div', { className: 'dsh-pl-chart-y' }, [...ticks].reverse().map((tick, index) => h('span', { key: index }, tickLabel(tick)))),
+        // 绘图区：图、悬浮提示、鼠标捕获层共用同一块坐标
+        h('div', { className: 'dsh-pl-chart-plot' }, plot, tip, overlay),
         lastLabel,
-        tip,
         h('div', { className: 'dsh-pl-chart-x' }, xLabels.map((label, index) => h('span', { key: index }, label))))
     }
 
@@ -3846,10 +3846,11 @@ window.__ModuleLoader__.load({
 .dsh-pl-chart-wrap { padding: 10px 14px 6px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 /* 图表：图本身用百分比坐标铺满绘图区，文字是 HTML，字号不随面板宽度变 */
 .dsh-pl-chartbox { position: relative; height: 200px; }
-.dsh-pl-chart { position: absolute; left: 44px; right: 0; top: 6px; bottom: 22px; display: block; width: auto; height: auto; }
+.dsh-pl-chart-plot { position: absolute; left: 44px; right: 0; top: 6px; bottom: 22px; }
+.dsh-pl-chart { display: block; width: 100%; height: 100%; }
 .dsh-pl-chart-y { position: absolute; left: 0; top: 6px; bottom: 22px; width: 38px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
 .dsh-pl-chart-x { position: absolute; left: 44px; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
-.dsh-pl-chart-overlay { position: absolute; left: 44px; right: 0; top: 6px; bottom: 22px; cursor: crosshair; }
+.dsh-pl-chart-overlay { position: absolute; inset: 0; cursor: crosshair; }
 .dsh-pl-chart-last { position: absolute; right: 0; top: 0; font-size: var(--pl-fs-md); font-weight: 650; color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
 .dsh-pl-chart-tip { position: absolute; transform: translate(-50%, calc(-100% - 8px)); display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); white-space: nowrap; pointer-events: none; z-index: 2; }
 .dsh-pl-chart-tip strong { font-size: var(--pl-fs-md); font-weight: 650; color: var(--dsw-alias-label-primary); }
