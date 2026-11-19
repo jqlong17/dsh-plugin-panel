@@ -606,166 +606,142 @@ window.__ModuleLoader__.load({
     }
 
     /** Bars for the day-over-day change; the first day has no previous snapshot. */
+    /** 图的公共外壳：左边的刻度、底部的日期、图本身用百分比坐标，文字走 HTML。 */
+    function chartFrame({ ticks, tickLabel, xLabels, lastLabel, plot, overlay, tip }) {
+      return h('div', { className: 'dsh-pl-chartbox' },
+        h('div', { className: 'dsh-pl-chart-y' }, ticks.map((tick, index) => h('span', { key: index }, tickLabel(tick)))),
+        plot,
+        overlay,
+        lastLabel,
+        tip,
+        h('div', { className: 'dsh-pl-chart-x' }, xLabels.map((label, index) => h('span', { key: index }, label))))
+    }
+
+    /** 鼠标在绘图区的位置 → 第几根柱子/第几个点。 */
+    function hoverIndexAt(event, count) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      if (!rect.width) return -1
+      const ratio = (event.clientX - rect.left) / rect.width
+      return Math.max(0, Math.min(count - 1, Math.round(ratio * Math.max(count - 1, 1))))
+    }
+
     function barChart(days, hoverIndex, onHover) {
-      const W = 1000
-      const H = 250
-      const L = 68
-      const R = 24
-      const T = 18
-      const B = 42
-      const deltas = days.map((day, index) => (index === 0 ? null : day.count - days[index - 1].count))
-      const usable = deltas.filter((value) => typeof value === 'number')
-      const peak = Math.max(...usable, 1) * 1.15
       const n = days.length
-      const slot = (W - L - R) / Math.max(n, 1)
-      const barW = Math.max(2, Math.min(slot * 0.62, 14))
-      const x = (i) => L + slot * i + slot / 2
-      const zeroY = T + (H - T - B)
-      const y = (v) => zeroY - ((H - T - B) * v) / Math.max(peak, 1)
-      const ticks = [0, 0.5, 1].map((r) => Math.round((peak * r) / 500) * 500)
+      const deltas = days.map((day, index) => (index === 0 ? 0 : Math.max(0, day.count - days[index - 1].count)))
+      const peak = Math.max(...deltas, 1) * 1.15
+      const slot = 100 / Math.max(n, 1)
+      const barW = Math.min(slot * 0.6, 3.2)
+      const yOf = (value) => 100 - (value / peak) * 100
+      const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => peak * ratio)
       const labelIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1]
-
-      const pick = (event) => {
-        const rect = event.currentTarget.getBoundingClientRect()
-        if (!rect.width) return
-        const px = ((event.clientX - rect.left) / rect.width) * W
-        const index = Math.round((px - L - slot / 2) / Math.max(slot, 1))
-        onHover(Math.max(0, Math.min(n - 1, index)))
-      }
-
       const hovered = hoverIndex >= 0 && hoverIndex < n ? hoverIndex : -1
-      const hx = hovered >= 0 ? x(hovered) : 0
-      const value = hovered >= 0 ? deltas[hovered] : null
-      const boxW = 200
-      const boxH = 64
-      const boxX = hovered >= 0 ? Math.min(Math.max(hx - boxW / 2, L), W - R - boxW) : 0
-      const boxY = hovered >= 0 ? Math.max(T + 8, y(typeof value === 'number' ? value : 0) - boxH - 14) : 0
-      const shown = typeof value === 'number' ? `${value >= 0 ? '+' : ''}${value.toLocaleString()}` : '—'
 
-      return h('svg', {
+      const plot = h('svg', {
         className: 'dsh-pl-chart',
-        viewBox: `0 0 ${W} ${H}`,
+        viewBox: '0 0 100 100',
+        preserveAspectRatio: 'none',
         role: 'img',
-        onMouseMove: pick,
-        onMouseLeave: () => onHover(-1),
       },
-        ticks.map((tick, i) => h('line', {
-          key: `g${i}`, x1: L, x2: W - R, y1: y(tick), y2: y(tick),
-          stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 1,
-        })),
-        ticks.map((tick, i) => h('text', {
-          key: `t${i}`, x: L - 12, y: y(tick) + 6, textAnchor: 'end',
-          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
-        }, `+${Math.round(tick / 1000)}k`)),
-        deltas.map((delta, i) => {
-          if (typeof delta !== 'number') return null
-          const top = Math.min(y(delta), zeroY)
-          const height = Math.max(1, Math.abs(zeroY - y(delta)))
-          return h('rect', {
-            key: `b${i}`, x: x(i) - barW / 2, y: top, width: barW, height,
-            rx: Math.min(2, barW / 2),
-            fill: 'var(--dsw-alias-state-business-primary)',
-            opacity: hovered === i ? 0.95 : 0.55,
-          })
-        }),
-        labelIndexes.map((i) => h('text', {
-          key: `d${i}`, x: x(i), y: H - B + 34, textAnchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
-          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
-        }, days[i].day.slice(5))),
-        hovered >= 0 ? h('g', null,
-          h('line', {
-            x1: hx, x2: hx, y1: T, y2: H - B,
-            stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.5,
-          }),
-          h('rect', {
-            x: boxX, y: boxY, width: boxW, height: boxH, rx: 10,
-            fill: 'var(--dsw-alias-bg-overlay)', stroke: 'var(--dsw-alias-border-l2)', strokeWidth: 1,
-          }),
-          h('text', { x: boxX + 14, y: boxY + 24, fill: 'var(--dsw-alias-label-secondary)', fontSize: 16 }, days[hovered].day),
-          h('text', { x: boxX + 14, y: boxY + 50, fill: 'var(--dsw-alias-label-primary)', fontSize: 22, fontWeight: 600 }, shown),
-        ) : null,
-      )
+      ticks.map((tick, index) => h('line', {
+        key: `g${index}`, x1: 0, x2: 100, y1: yOf(tick), y2: yOf(tick),
+        stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 0.4, vectorEffect: 'non-scaling-stroke',
+      })),
+      deltas.map((value, index) => h('rect', {
+        key: `b${index}`,
+        x: index * slot + (slot - barW) / 2,
+        y: yOf(value),
+        width: barW,
+        height: Math.max(100 - yOf(value), 0.4),
+        rx: 0.6,
+        fill: 'var(--dsw-alias-state-business-primary)',
+        opacity: hovered === index ? 1 : 0.55,
+      })))
+
+      const overlay = h('div', {
+        className: 'dsh-pl-chart-overlay',
+        onMouseMove: (event) => onHover(hoverIndexAt(event, n)),
+        onMouseLeave: () => onHover(-1),
+      })
+
+      const tip = hovered >= 0
+        ? h('div', {
+          className: 'dsh-pl-chart-tip',
+          style: {
+            left: `${hovered * slot + slot / 2}%`,
+            top: `${yOf(deltas[hovered])}%`,
+          },
+        }, `${days[hovered].day.slice(5)} · +${deltas[hovered].toLocaleString()}`)
+        : null
+
+      return chartFrame({
+        ticks,
+        tickLabel: (tick) => (tick >= 1000 ? `${Math.round(tick / 1000)}k` : String(Math.round(tick))),
+        xLabels: labelIndexes.map((index) => days[index].day.slice(5)),
+        lastLabel: h('div', { className: 'dsh-pl-chart-last' }, days[n - 1].count.toLocaleString()),
+        plot,
+        overlay,
+        tip,
+      })
     }
 
     function trendChart(days, hoverIndex, onHover, firstNote) {
-      const W = 1000
-      const H = 250
-      const L = 68
-      const R = 24
-      const T = 18
-      const B = 42
-      const values = days.map((d) => d.count)
-      const max = Math.max(...values, 1) * 1.2
       const n = days.length
-      const x = (i) => L + (W - L - R) * (n <= 1 ? 0.5 : i / (n - 1))
-      const y = (v) => T + (H - T - B) * (1 - v / max)
-      const line = days.map((d, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(d.count).toFixed(1)}`).join(' ')
-      const area = `${line} L ${x(n - 1).toFixed(1)} ${H - B} L ${x(0).toFixed(1)} ${H - B} Z`
-      const ticks = [0, 0.25, 0.5, 0.75, 1].map((r) => Math.round((max * r) / 1000) * 1000)
+      const values = days.map((day) => day.count)
+      const max = Math.max(...values, 1) * 1.12
+      const xOf = (index) => (n <= 1 ? 50 : (index / (n - 1)) * 100)
+      const yOf = (value) => 100 - (value / max) * 100
+      const line = days.map((day, index) => `${index === 0 ? 'M' : 'L'} ${xOf(index).toFixed(2)} ${yOf(day.count).toFixed(2)}`).join(' ')
+      const area = `${line} L 100 100 L 0 100 Z`
+      const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => max * ratio)
       const labelIndexes = n <= 1 ? [0] : [0, Math.floor((n - 1) / 2), n - 1]
-
-      const pick = (event) => {
-        const rect = event.currentTarget.getBoundingClientRect()
-        if (!rect.width) return
-        const px = ((event.clientX - rect.left) / rect.width) * W
-        const ratio = (px - L) / Math.max(W - L - R, 1)
-        const index = Math.round(ratio * Math.max(n - 1, 1))
-        onHover(Math.max(0, Math.min(n - 1, index)))
-      }
-
       const hovered = hoverIndex >= 0 && hoverIndex < n ? hoverIndex : -1
-      const hx = hovered >= 0 ? x(hovered) : 0
-      const hy = hovered >= 0 ? y(values[hovered]) : 0
-      const isFirst = hovered === 0
-      const boxW = isFirst ? 246 : 196
-      const boxH = isFirst ? 96 : 64
-      const boxX = hovered >= 0 ? Math.min(Math.max(hx - boxW / 2, L), W - R - boxW) : 0
-      const boxY = hovered >= 0 ? Math.max(hy - boxH - 16, T) : 0
 
-      return h('svg', {
+      const plot = h('svg', {
         className: 'dsh-pl-chart',
-        viewBox: `0 0 ${W} ${H}`,
+        viewBox: '0 0 100 100',
+        preserveAspectRatio: 'none',
         role: 'img',
-        onMouseMove: pick,
-        onMouseLeave: () => onHover(-1),
       },
-        ticks.map((tick, i) => h('line', {
-          key: `g${i}`, x1: L, x2: W - R, y1: y(tick), y2: y(tick),
-          stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 1,
-        })),
-        ticks.map((tick, i) => h('text', {
-          key: `t${i}`, x: L - 12, y: y(tick) + 6, textAnchor: 'end',
-          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
-        }, `${Math.round(tick / 1000)}k`)),
-        h('path', { d: area, fill: 'var(--dsw-alias-state-business-primary)', opacity: 0.08 }),
-        h('path', { d: line, fill: 'none', stroke: 'var(--dsw-alias-state-business-primary)', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
-        labelIndexes.map((i) => h('text', {
-          key: `d${i}`, x: x(i), y: H - B + 34, textAnchor: i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle',
-          fill: 'var(--dsw-alias-label-secondary)', fontSize: 16,
-        }, days[i].day.slice(5))),
-        h('text', {
-          x: x(n - 1), y: y(values[n - 1]) - 16, textAnchor: 'end',
-          fill: 'var(--dsw-alias-label-primary)', fontSize: 22, fontWeight: 600,
-        }, String(values[n - 1])),
-        hovered >= 0 ? h('g', null,
-          h('line', {
-            x1: hx, x2: hx, y1: T, y2: H - B,
-            stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.5,
-          }),
-          h('circle', { cx: hx, cy: hy, r: 4.5, fill: 'var(--dsw-alias-state-business-primary)', stroke: 'var(--dsw-alias-bg-layer-1)', strokeWidth: 2 }),
-          h('rect', {
-            x: boxX, y: boxY, width: boxW, height: boxH, rx: 10,
-            fill: 'var(--dsw-alias-bg-overlay)', stroke: 'var(--dsw-alias-border-l2)', strokeWidth: 1,
-          }),
-          h('text', { x: boxX + 14, y: boxY + 24, fill: 'var(--dsw-alias-label-secondary)', fontSize: 16 },
-            days[hovered].day),
-          h('text', { x: boxX + 14, y: boxY + 50, fill: 'var(--dsw-alias-label-primary)', fontSize: 22, fontWeight: 600 },
-            `${values[hovered].toLocaleString()} 个`),
-          isFirst && firstNote
-            ? h('text', { x: boxX + 14, y: boxY + 78, fill: 'var(--dsw-alias-label-secondary)', fontSize: 14 }, firstNote)
-            : null,
-        ) : null,
-      )
+      ticks.map((tick, index) => h('line', {
+        key: `g${index}`, x1: 0, x2: 100, y1: yOf(tick), y2: yOf(tick),
+        stroke: 'var(--dsw-alias-border-l1)', strokeWidth: 0.4, vectorEffect: 'non-scaling-stroke',
+      })),
+      h('path', { d: area, fill: 'var(--dsw-alias-state-business-primary)', opacity: 0.08 }),
+      h('path', {
+        d: line, fill: 'none', stroke: 'var(--dsw-alias-state-business-primary)',
+        strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', vectorEffect: 'non-scaling-stroke',
+      }),
+      hovered >= 0 ? h('line', {
+        x1: xOf(hovered), x2: xOf(hovered), y1: 0, y2: 100,
+        stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1,
+        strokeDasharray: '4 4', opacity: 0.5, vectorEffect: 'non-scaling-stroke',
+      }) : null)
+
+      const overlay = h('div', {
+        className: 'dsh-pl-chart-overlay',
+        onMouseMove: (event) => onHover(hoverIndexAt(event, n)),
+        onMouseLeave: () => onHover(-1),
+      })
+
+      const tip = hovered >= 0
+        ? h('div', {
+          className: 'dsh-pl-chart-tip',
+          style: { left: `${xOf(hovered)}%`, top: `${yOf(values[hovered])}%` },
+        },
+        h('span', { className: 'dsh-pl-chart-tip-day' }, days[hovered].day),
+        h('strong', null, `${values[hovered].toLocaleString()} 个`),
+        hovered === 0 && firstNote ? h('span', { className: 'dsh-pl-chart-tip-note' }, firstNote) : null)
+        : null
+
+      return chartFrame({
+        ticks,
+        tickLabel: (tick) => `${Math.round(tick / 1000)}k`,
+        xLabels: labelIndexes.map((index) => days[index].day.slice(5)),
+        lastLabel: h('div', { className: 'dsh-pl-chart-last' }, String(values[n - 1])),
+        plot,
+        overlay,
+        tip,
+      })
     }
 
     function detailNames(plugin, bundle) {
@@ -3867,9 +3843,17 @@ window.__ModuleLoader__.load({
 .dsh-pl-stat { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-stat span { font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
 .dsh-pl-stat strong { font-size: var(--pl-fs-num); font-weight: 600; line-height: 1.2; }
-.dsh-pl-chart-wrap { padding: 10px 12px 4px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
-/* 图表按宽度缩放，但高度封顶：面板很宽时不会变成一张巨图 */
-.dsh-pl-chart { display: block; width: 100%; height: auto; max-height: 260px; }
+.dsh-pl-chart-wrap { padding: 10px 14px 6px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-card); background: var(--dsw-alias-bg-layer-1); }
+/* 图表：图本身用百分比坐标铺满绘图区，文字是 HTML，字号不随面板宽度变 */
+.dsh-pl-chartbox { position: relative; height: 200px; }
+.dsh-pl-chart { position: absolute; left: 44px; right: 0; top: 6px; bottom: 22px; display: block; width: auto; height: auto; }
+.dsh-pl-chart-y { position: absolute; left: 0; top: 6px; bottom: 22px; width: 38px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
+.dsh-pl-chart-x { position: absolute; left: 44px; right: 0; bottom: 0; display: flex; justify-content: space-between; font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); }
+.dsh-pl-chart-overlay { position: absolute; left: 44px; right: 0; top: 6px; bottom: 22px; cursor: crosshair; }
+.dsh-pl-chart-last { position: absolute; right: 0; top: 0; font-size: var(--pl-fs-md); font-weight: 650; color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
+.dsh-pl-chart-tip { position: absolute; transform: translate(-50%, calc(-100% - 8px)); display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); font-size: var(--pl-fs-xs); color: var(--dsw-alias-label-secondary); white-space: nowrap; pointer-events: none; z-index: 2; }
+.dsh-pl-chart-tip strong { font-size: var(--pl-fs-md); font-weight: 650; color: var(--dsw-alias-label-primary); }
+.dsh-pl-chart-tip-note { color: var(--dsw-alias-label-secondary); }
 .dsh-pl-about { padding: 16px 18px; margin-bottom: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--pl-radius-inner); background: var(--dsw-alias-bg-layer-1); }
 .dsh-pl-about-h { margin: 0 0 10px; font-size: var(--pl-fs-lg); font-weight: 600; color: var(--dsw-alias-label-primary); }
 .dsh-pl-about-p { margin: 0 0 8px; font-size: var(--pl-fs-sm); line-height: 1.7; color: var(--dsw-alias-label-secondary); }
